@@ -6,6 +6,16 @@ namespace
 const auto accent = juce::Colour::fromRGB(150, 100, 255);
 const auto panelColour = juce::Colour::fromRGB(20, 19, 30);
 const auto panelEdge = juce::Colour::fromRGB(57, 49, 78);
+
+const juce::StringArray modulationSources {
+    "None", "LFO 1", "LFO 2", "LFO 3", "LFO 4", "Env 1", "Env 2", "Env 3",
+    "Velocity", "Key", "Mod Wheel", "Aftertouch", "Macro 1", "Macro 2", "Macro 3", "Macro 4",
+    "Brown", "Stochastic"
+};
+
+const juce::StringArray modulationDestinations {
+    "None", "Pitch", "Cutoff", "Resonance", "Osc Mix", "Detune", "Spread", "Drive", "Pulse Width"
+};
 }
 
 ParamKnob::ParamKnob(juce::AudioProcessorValueTreeState& state,
@@ -105,9 +115,9 @@ OmnariaAudioProcessorEditor::OmnariaAudioProcessorEditor(OmnariaAudioProcessor& 
       coupling(p.parameters, "coupling", "Coupling"),
       output(p.parameters, "output", "Output")
 {
-    setSize(1280, 760);
+    setSize(1280, 900);
     setResizable(true, false);
-    setResizeLimits(1120, 680, 1800, 1100);
+    setResizeLimits(1180, 800, 1800, 1200);
 
     title.setText("OMNARIA", juce::dontSendNotification);
     title.setJustificationType(juce::Justification::centred);
@@ -134,6 +144,24 @@ OmnariaAudioProcessorEditor::OmnariaAudioProcessorEditor(OmnariaAudioProcessor& 
     for (auto* component : components)
         addAndMakeVisible(*component);
 
+    for (int i = 0; i < 4; ++i)
+    {
+        const auto suffix = juce::String(i + 1);
+        lfoRates[static_cast<size_t>(i)] = std::make_unique<ParamKnob>(p.parameters, "lfo" + suffix + "_rate", "LFO " + suffix + " Hz");
+        lfoModes[static_cast<size_t>(i)] = std::make_unique<ParamCombo>(p.parameters, "lfo" + suffix + "_mode", "LFO " + suffix, juce::StringArray { "Free", "Retrig", "One Shot" });
+        macros[static_cast<size_t>(i)] = std::make_unique<ParamKnob>(p.parameters, "macro" + suffix, "Macro " + suffix);
+        modSources[static_cast<size_t>(i)] = std::make_unique<ParamCombo>(p.parameters, "mod" + suffix + "_source", "Source " + suffix, modulationSources);
+        modDestinations[static_cast<size_t>(i)] = std::make_unique<ParamCombo>(p.parameters, "mod" + suffix + "_dest", "Destination " + suffix, modulationDestinations);
+        modDepths[static_cast<size_t>(i)] = std::make_unique<ParamKnob>(p.parameters, "mod" + suffix + "_depth", "Depth " + suffix);
+
+        addAndMakeVisible(*lfoRates[static_cast<size_t>(i)]);
+        addAndMakeVisible(*lfoModes[static_cast<size_t>(i)]);
+        addAndMakeVisible(*macros[static_cast<size_t>(i)]);
+        addAndMakeVisible(*modSources[static_cast<size_t>(i)]);
+        addAndMakeVisible(*modDestinations[static_cast<size_t>(i)]);
+        addAndMakeVisible(*modDepths[static_cast<size_t>(i)]);
+    }
+
     discoverButton.setColour(juce::TextButton::buttonColourId, accent.withAlpha(0.22f));
     discoverButton.setColour(juce::TextButton::buttonOnColourId, accent.withAlpha(0.34f));
     discoverButton.setColour(juce::TextButton::textColourOffId, juce::Colours::white.withAlpha(0.90f));
@@ -147,14 +175,15 @@ void OmnariaAudioProcessorEditor::paint(juce::Graphics& g)
 
     auto body = getLocalBounds().toFloat();
     body.removeFromTop(76.0f);
-    auto stateStrip = body.removeFromBottom(166.0f).reduced(14.0f, 10.0f);
+    auto modulationStrip = body.removeFromBottom(286.0f).reduced(14.0f, 8.0f);
+    auto stateStrip = body.removeFromBottom(132.0f).reduced(14.0f, 6.0f);
     body = body.reduced(14.0f, 8.0f);
 
     auto left = body.removeFromLeft(350.0f);
     auto right = body.removeFromRight(430.0f);
     auto centre = body.reduced(10.0f, 0.0f);
 
-    for (const auto& panel : { left, centre, right, stateStrip })
+    for (const auto& panel : { left, centre, right, stateStrip, modulationStrip })
     {
         g.setColour(panelColour);
         g.fillRoundedRectangle(panel, 15.0f);
@@ -168,6 +197,7 @@ void OmnariaAudioProcessorEditor::paint(juce::Graphics& g)
     g.drawText("ENGINE STATE", centre.withTrimmedLeft(14.0f).removeFromTop(24.0f), juce::Justification::centredLeft);
     g.drawText("FILTER / EXPRESSION / AMP", right.withTrimmedLeft(14.0f).removeFromTop(24.0f), juce::Justification::centredLeft);
     g.drawText("PERFORMANCE", stateStrip.withTrimmedLeft(14.0f).removeFromTop(24.0f), juce::Justification::centredLeft);
+    g.drawText("MODULATION — VISIBLE ROUTING", modulationStrip.withTrimmedLeft(14.0f).removeFromTop(24.0f), juce::Justification::centredLeft);
 
     g.setColour(juce::Colours::white.withAlpha(0.72f));
     g.setFont(juce::FontOptions(15.0f));
@@ -185,7 +215,8 @@ void OmnariaAudioProcessorEditor::resized()
 
     auto body = bounds;
     body.removeFromTop(76);
-    auto stateStrip = body.removeFromBottom(166).reduced(14, 10);
+    auto modulationStrip = body.removeFromBottom(286).reduced(14, 8);
+    auto stateStrip = body.removeFromBottom(132).reduced(14, 6);
     body = body.reduced(14, 8);
 
     auto left = body.removeFromLeft(350).reduced(12);
@@ -199,7 +230,7 @@ void OmnariaAudioProcessorEditor::resized()
     oscBShape.setBounds(comboRow.removeFromLeft(comboCell));
     phaseMode.setBounds(comboRow);
 
-    const auto oscRowHeight = juce::jmax(78, left.getHeight() / 3);
+    const auto oscRowHeight = juce::jmax(74, left.getHeight() / 3);
     auto oscRow1 = left.removeFromTop(oscRowHeight);
     auto oscCell1 = oscRow1.getWidth() / 4;
     oscMix.setBounds(oscRow1.removeFromLeft(oscCell1));
@@ -224,7 +255,7 @@ void OmnariaAudioProcessorEditor::resized()
 
     right.removeFromTop(24);
     filterMode.setBounds(right.removeFromTop(50));
-    const auto rightRowHeight = juce::jmax(78, right.getHeight() / 3);
+    const auto rightRowHeight = juce::jmax(74, right.getHeight() / 3);
 
     auto toneRow = right.removeFromTop(rightRowHeight);
     const auto toneCell = toneRow.getWidth() / 6;
@@ -256,4 +287,29 @@ void OmnariaAudioProcessorEditor::resized()
     focus.setBounds(stateStrip.removeFromLeft(stateCell));
     coupling.setBounds(stateStrip.removeFromLeft(stateCell));
     output.setBounds(stateStrip);
+
+    modulationStrip.removeFromTop(24);
+    auto sourceRow = modulationStrip.removeFromTop(104);
+    const auto sourceCell = sourceRow.getWidth() / 8;
+    for (int i = 0; i < 4; ++i)
+        lfoRates[static_cast<size_t>(i)]->setBounds(sourceRow.removeFromLeft(sourceCell));
+    for (int i = 0; i < 4; ++i)
+        macros[static_cast<size_t>(i)]->setBounds(sourceRow.removeFromLeft(sourceCell));
+
+    auto modeRow = modulationStrip.removeFromTop(50);
+    const auto modeCell = modeRow.getWidth() / 4;
+    for (int i = 0; i < 4; ++i)
+        lfoModes[static_cast<size_t>(i)]->setBounds(modeRow.removeFromLeft(modeCell).reduced(4, 0));
+
+    auto routeRow = modulationStrip;
+    const auto routeCellWidth = routeRow.getWidth() / 4;
+    for (int i = 0; i < 4; ++i)
+    {
+        auto slot = routeRow.removeFromLeft(routeCellWidth).reduced(5, 0);
+        auto depthArea = slot.removeFromRight(82);
+        auto sourceArea = slot.removeFromTop(slot.getHeight() / 2);
+        modSources[static_cast<size_t>(i)]->setBounds(sourceArea);
+        modDestinations[static_cast<size_t>(i)]->setBounds(slot);
+        modDepths[static_cast<size_t>(i)]->setBounds(depthArea);
+    }
 }
