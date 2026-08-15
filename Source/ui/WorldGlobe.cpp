@@ -12,7 +12,7 @@ WorldGlobe::WorldGlobe(const LatWorldState& worldState)
 
 void WorldGlobe::paint(juce::Graphics& g)
 {
-    const auto area = getLocalBounds().toFloat().reduced(12.0f);
+    auto area = getLocalBounds().toFloat().reduced(12.0f);
     const auto diameter = juce::jmin(area.getWidth(), area.getHeight()) - 46.0f;
     const juce::Rectangle<float> sphere(area.getCentreX() - diameter * 0.5f,
                                         area.getCentreY() - diameter * 0.5f - 6.0f,
@@ -45,7 +45,6 @@ void WorldGlobe::paint(juce::Graphics& g)
     g.setColour(accent.withAlpha(0.42f + energy * 0.30f));
     g.drawEllipse(sphere, 1.5f);
 
-    // World latitude/orbit lines. Their deformation is driven by Evolution.
     for (int ring = -2; ring <= 2; ++ring)
     {
         const auto yOffset = static_cast<float>(ring) * radius * 0.24f;
@@ -66,7 +65,6 @@ void WorldGlobe::paint(juce::Graphics& g)
         g.drawEllipse(meridianBounds, 1.0f);
     }
 
-    // Particle population. These points are deterministic; World state changes their geometry.
     constexpr int particleCount = 84;
     constexpr float goldenAngle = 2.39996323f;
     for (int i = 0; i < particleCount; ++i)
@@ -93,7 +91,6 @@ void WorldGlobe::paint(juce::Graphics& g)
         g.fillEllipse(point.x - dotSize * 0.5f, point.y - dotSize * 0.5f, dotSize, dotSize);
     }
 
-    // Harmonic gravity well: the visible core becomes stronger as more notes and gravity are present.
     const auto noteCount = static_cast<float>(state.activeNotes.load());
     const auto coreRadius = 8.0f + 16.0f * gravity + juce::jmin(16.0f, noteCount * 2.4f);
     juce::ColourGradient coreGlow(juce::Colours::white.withAlpha(0.75f), centre.x, centre.y,
