@@ -42,6 +42,8 @@ target_sources(Omnaria
         Source/dsp/BandlimitedOscillator.h
         Source/dsp/NastyCell.h
         Source/dsp/SamplePool.h
+        Source/dsp/ProductionFX.cpp
+        Source/dsp/ProductionFX.h
         Source/dsp/OmnariaState.h
         Source/dsp/OmnariaStateEngine.cpp
         Source/dsp/OmnariaStateEngine.h
