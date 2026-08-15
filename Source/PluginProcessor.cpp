@@ -22,13 +22,21 @@ juce::AudioProcessorValueTreeState::ParameterLayout OmnariaAudioProcessor::creat
     layout.push_back(std::make_unique<juce::AudioParameterChoice>("oscB_shape", "Osc B Shape", juce::StringArray { "Saw", "Pulse", "Sine" }, 0));
     layout.push_back(std::make_unique<juce::AudioParameterFloat>("osc_mix", "Osc Mix", juce::NormalisableRange<float>(0.0f, 1.0f), 0.28f));
     layout.push_back(std::make_unique<juce::AudioParameterInt>("oscB_coarse", "Osc B Coarse", -24, 24, 0));
+    layout.push_back(std::make_unique<juce::AudioParameterFloat>("pulse_width", "Pulse Width", juce::NormalisableRange<float>(0.05f, 0.95f, 0.001f), 0.50f));
+    layout.push_back(std::make_unique<juce::AudioParameterChoice>("phase_mode", "Phase Mode", juce::StringArray { "Retrig", "Random" }, 0));
+    layout.push_back(std::make_unique<juce::AudioParameterFloat>("phase", "Phase", juce::NormalisableRange<float>(0.0f, 1.0f), 0.0f));
     layout.push_back(std::make_unique<juce::AudioParameterInt>("unison", "Unison", 1, 9, 5));
     layout.push_back(std::make_unique<juce::AudioParameterFloat>("detune", "Detune", juce::NormalisableRange<float>(0.0f, 50.0f, 0.01f), 12.0f));
     layout.push_back(std::make_unique<juce::AudioParameterFloat>("spread", "Stereo Spread", juce::NormalisableRange<float>(0.0f, 1.0f), 0.82f));
+    layout.push_back(std::make_unique<juce::AudioParameterFloat>("sub_level", "Sub Level", juce::NormalisableRange<float>(0.0f, 1.0f), 0.0f));
+    layout.push_back(std::make_unique<juce::AudioParameterInt>("sub_octave", "Sub Octave", -2, 0, -1));
+    layout.push_back(std::make_unique<juce::AudioParameterFloat>("noise_level", "Noise Level", juce::NormalisableRange<float>(0.0f, 0.5f), 0.0f));
 
     auto cutoffRange = juce::NormalisableRange<float>(20.0f, 20000.0f, 0.0f, 0.22f);
+    layout.push_back(std::make_unique<juce::AudioParameterChoice>("filter_mode", "Filter Mode", juce::StringArray { "LP12", "LP24", "HP12", "BP12" }, 1));
     layout.push_back(std::make_unique<juce::AudioParameterFloat>("cutoff", "Cutoff", cutoffRange, 7200.0f));
     layout.push_back(std::make_unique<juce::AudioParameterFloat>("resonance", "Resonance", juce::NormalisableRange<float>(0.2f, 12.0f, 0.001f, 0.5f), 0.72f));
+    layout.push_back(std::make_unique<juce::AudioParameterFloat>("keytrack", "Filter Keytrack", juce::NormalisableRange<float>(0.0f, 1.0f), 0.25f));
     layout.push_back(std::make_unique<juce::AudioParameterFloat>("drive", "Drive", juce::NormalisableRange<float>(0.0f, 24.0f, 0.01f), 1.5f));
     layout.push_back(std::make_unique<juce::AudioParameterFloat>("filter_env_amt", "Filter Env Amount", juce::NormalisableRange<float>(-6.0f, 6.0f, 0.01f), 0.0f));
     layout.push_back(std::make_unique<juce::AudioParameterFloat>("velocity_timbre", "Velocity Timbre", juce::NormalisableRange<float>(0.0f, 1.0f), 0.35f));
@@ -43,7 +51,6 @@ juce::AudioProcessorValueTreeState::ParameterLayout OmnariaAudioProcessor::creat
     layout.push_back(std::make_unique<juce::AudioParameterFloat>("sustain", "Sustain", juce::NormalisableRange<float>(0.0f, 1.0f), 0.76f));
     layout.push_back(std::make_unique<juce::AudioParameterFloat>("release", "Release", juce::NormalisableRange<float>(0.005f, 20.0f, 0.0f, 0.25f), 0.75f));
 
-    // Experimental performance-state controls. These do not imply a new synthesis method.
     layout.push_back(std::make_unique<juce::AudioParameterFloat>("motion", "Motion", juce::NormalisableRange<float>(0.0f, 1.0f), 0.0f));
     layout.push_back(std::make_unique<juce::AudioParameterFloat>("history", "History", juce::NormalisableRange<float>(0.0f, 1.0f), 0.35f));
     layout.push_back(std::make_unique<juce::AudioParameterFloat>("focus", "Focus", juce::NormalisableRange<float>(0.0f, 1.0f), 0.78f));
@@ -127,62 +134,42 @@ void OmnariaAudioProcessor::setParameterFromActualValue(const juce::String& id, 
 
 void OmnariaAudioProcessor::randomiseDiscoverable()
 {
-    // DISCOVER v0.2: evolve the sound that is already in front of the producer.
-    // Every result is made exclusively from normal APVTS parameters, so all
-    // changes remain visible, automatable and manually reversible. Locks,
-    // change history and graph/modulation mutation are later rebuild stages.
     auto& random = juce::Random::getSystemRandom();
-
-    const auto uniform = [&random](float low, float high)
-    {
-        return low + random.nextFloat() * (high - low);
-    };
-
+    const auto uniform = [&random](float low, float high) { return low + random.nextFloat() * (high - low); };
     const auto current = [this](const juce::String& id)
     {
         if (auto* parameter = parameters.getParameter(id))
             return parameter->convertFrom0to1(parameter->getValue());
         return 0.0f;
     };
-
     const auto mutateLinear = [&] (const juce::String& id, float amount, float low, float high)
     {
-        setParameterFromActualValue(id,
-                                    juce::jlimit(low, high,
-                                                 current(id) + uniform(-amount, amount)));
+        setParameterFromActualValue(id, juce::jlimit(low, high, current(id) + uniform(-amount, amount)));
     };
-
     const auto mutateRatio = [&] (const juce::String& id, float octaves, float low, float high)
     {
-        const auto ratio = std::pow(2.0f, uniform(-octaves, octaves));
-        setParameterFromActualValue(id,
-                                    juce::jlimit(low, high, current(id) * ratio));
+        setParameterFromActualValue(id, juce::jlimit(low, high, current(id) * std::pow(2.0f, uniform(-octaves, octaves))));
     };
 
-    if (random.nextFloat() < 0.22f)
-        setParameterFromActualValue("oscA_shape", static_cast<float>(random.nextInt(3)));
-    if (random.nextFloat() < 0.22f)
-        setParameterFromActualValue("oscB_shape", static_cast<float>(random.nextInt(3)));
-
+    if (random.nextFloat() < 0.22f) setParameterFromActualValue("oscA_shape", static_cast<float>(random.nextInt(3)));
+    if (random.nextFloat() < 0.22f) setParameterFromActualValue("oscB_shape", static_cast<float>(random.nextInt(3)));
     mutateLinear("osc_mix", 0.14f, 0.0f, 1.0f);
-
+    mutateLinear("pulse_width", 0.08f, 0.05f, 0.95f);
     if (random.nextFloat() < 0.28f)
     {
         constexpr int musicalOffsets[] { -12, -7, 0, 7, 12 };
-        setParameterFromActualValue("oscB_coarse",
-                                    static_cast<float>(musicalOffsets[random.nextInt(5)]));
+        setParameterFromActualValue("oscB_coarse", static_cast<float>(musicalOffsets[random.nextInt(5)]));
     }
-
     const auto currentUnison = juce::roundToInt(current("unison"));
-    const auto unisonDelta = random.nextInt(3) - 1;
-    setParameterFromActualValue("unison",
-                                static_cast<float>(juce::jlimit(1, 9, currentUnison + unisonDelta * 2)));
-
+    setParameterFromActualValue("unison", static_cast<float>(juce::jlimit(1, 9, currentUnison + (random.nextInt(3) - 1) * 2)));
     mutateLinear("detune", 5.0f, 0.0f, 50.0f);
     mutateLinear("spread", 0.12f, 0.0f, 1.0f);
+    mutateLinear("sub_level", 0.10f, 0.0f, 1.0f);
+    mutateLinear("noise_level", 0.05f, 0.0f, 0.5f);
 
     mutateRatio("cutoff", 0.65f, 40.0f, 19000.0f);
     mutateRatio("resonance", 0.45f, 0.2f, 12.0f);
+    mutateLinear("keytrack", 0.12f, 0.0f, 1.0f);
     mutateLinear("drive", 3.5f, 0.0f, 24.0f);
     mutateLinear("filter_env_amt", 0.75f, -6.0f, 6.0f);
     mutateLinear("velocity_timbre", 0.12f, 0.0f, 1.0f);
@@ -191,19 +178,14 @@ void OmnariaAudioProcessor::randomiseDiscoverable()
     mutateRatio("filter_decay", 0.60f, 0.001f, 10.0f);
     mutateLinear("filter_sustain", 0.12f, 0.0f, 1.0f);
     mutateRatio("filter_release", 0.55f, 0.005f, 20.0f);
-
     mutateRatio("attack", 0.65f, 0.001f, 10.0f);
     mutateRatio("decay", 0.55f, 0.001f, 10.0f);
     mutateLinear("sustain", 0.12f, 0.0f, 1.0f);
     mutateRatio("release", 0.55f, 0.005f, 20.0f);
-
     mutateLinear("motion", 0.14f, 0.0f, 1.0f);
     mutateLinear("history", 0.12f, 0.0f, 1.0f);
     mutateLinear("focus", 0.10f, 0.0f, 1.0f);
     mutateLinear("coupling", 0.12f, 0.0f, 1.0f);
-
-    // Output is intentionally untouched: exploration should not win by simply
-    // becoming louder than its parent sound.
 }
 
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
