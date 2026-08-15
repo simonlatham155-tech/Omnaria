@@ -26,10 +26,10 @@ public:
     bool isMidiEffect() const override { return false; }
     double getTailLengthSeconds() const override { return 20.0; }
 
-    int getNumPrograms() override { return 1; }
-    int getCurrentProgram() override { return 0; }
-    void setCurrentProgram(int) override {}
-    const juce::String getProgramName(int) override { return {}; }
+    int getNumPrograms() override;
+    int getCurrentProgram() override { return currentProgram; }
+    void setCurrentProgram(int index) override;
+    const juce::String getProgramName(int index) override;
     void changeProgramName(int, const juce::String&) override {}
 
     void getStateInformation(juce::MemoryBlock& destData) override;
@@ -47,6 +47,8 @@ private:
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
     void setParameterFromActualValue(const juce::String& id, float actualValue);
     void writeCaptureHistory(const juce::AudioBuffer<float>& buffer);
+    void applyFactoryPreset(int index);
+    void resetFactoryPresetParameters();
 
     omnaria::OmnariaState engineState;
     omnaria::OmnariaStateEngine stateEngine;
@@ -61,6 +63,7 @@ private:
     double currentSampleRate { 44100.0 };
     mutable juce::CriticalSection sampleNameLock;
     juce::String sampleName { "EMPTY" };
+    int currentProgram { 0 };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(OmnariaAudioProcessor)
 };
