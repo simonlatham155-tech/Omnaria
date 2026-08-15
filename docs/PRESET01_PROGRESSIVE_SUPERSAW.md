@@ -6,6 +6,18 @@ Status: BUILDING / NOT YET ACCEPTED
 
 This preset is the first Phase 8 gate. It must compete directly with strong Sylenth1 and Spire supersaw/lead patches before preset 02 is allowed into the factory bank.
 
+## Seven-stage Part 1 process
+
+1. Reference equation — define the Sylenth1/Spire acoustic target.
+2. Unison geometry — separate frequency spacing from stereo spacing and reduce repeated beat families.
+3. Keyboard optimisation — make detune behaviour useful across low and high registers.
+4. Energy architecture — preserve a strong centre while tapering and power-normalising side voices.
+5. Multi-stochastic evolution — give Brown and broad stochastic processes different physical jobs.
+6. Phase/transient optimisation — compare all-random, all-retriggered and hybrid centre/side phase laws.
+7. Final acceptance — level-matched benchmark plus mono, streaming/small-speaker, stereo, range, peak, alias and CPU checks.
+
+Current stage: 5 of 7.
+
 ## What the benchmark synths teach us
 
 ### Sylenth1
@@ -30,50 +42,67 @@ For a saw at fundamental f0, each detuned voice produces harmonic lines at n * f
 
 Published JP-8000 supersaw analysis identifies a centre saw plus six asymmetrically/non-uniformly detuned side saws. Measured relative frequency offsets reported from that work are approximately -0.1100, -0.0629, -0.0195, 0, +0.0199, +0.0622, +0.1075 times the detune factor. The lesson is non-uniform beat distribution, not cloning the JP-8000.
 
-Random/free initial phase is used for the current OMNARIA candidate because repeated identical phase starts can create a static comb-like attack. We will A/B this against retriggered phase during listening because transient consistency can sometimes be preferable in a lead.
+OMNARIA now separates frequency position, stereo position and per-voice energy. The seven-voice law also uses pitch-aware detune so the same public detune value does not create excessively slow low-note beating and frantic high-note beating.
 
 ## Candidate A — clean CORE baseline
 
 - saw + saw
 - 7 unison voices
-- 13.2-cent current OMNARIA detune parameter
+- 13.2-cent public detune setting
 - broad but not maximum stereo spread
 - random initial phase
 - LP24
 - no NASTY
 - no SAMPLE
-- no Brown/Stochastic modulation
+- no stochastic modulation
 - no chorus/delay/reverb during the dry benchmark
 - neutral filter character
 
 This deliberately prevents specialist engines and FX from hiding weaknesses in CORE.
 
-## Candidate B — CORE plus sub-perceptual Brown decorrelation
+## Candidate B1/B2 — optimised CORE geometry and energy
 
-Candidate B preserves the same CORE identity but uses Brown motion only to vary the unison detune magnitude by a very small amount.
+The current CORE path uses:
+- non-uniform seven-voice frequency placement
+- separate stereo placement
+- pitch-aware detune
+- centre-weighted side-voice energy
+- power matching against the previous equal-gain implementation
 
-Brown state:
+These changes are intended to improve useful beat density, centre-pitch certainty, mono survival and mass-playback translation without allowing extra loudness to win the comparison.
+
+## Candidate B3 — multi-stochastic evolution
+
+Brown and broad stochastic motion are intentionally not interchangeable.
+
+### Brown job: detune-cloud breathing
 
 b[n] = clamp(rho * b[n-1] + sigma * xi[n], -1, 1)
 
-Current OMNARIA Brown source is bounded and heavily correlated in time. With modulation depth 0.035 at the Detune destination, the existing modulation law produces approximately +/-0.63 cent maximum variation around the 13.2-cent detune setting.
+d_eff(t) = d0 + 18 * 0.035 * b(t) cents
 
-The centre frequency itself is not pitch-modulated. Brown changes only the width of the detuned cloud, so the intended acoustic effect is:
-- reduce stationary/repeating beat relationships
-- increase long-term spectral density
-- preserve centre-pitch certainty
-- remain below the point where the listener hears obvious pitch wobble
+Therefore the maximum change is approximately +/-0.63 cent. Brown changes cloud width rather than global pitch. The centre voice has zero detune position, so its fundamental stays fixed.
 
-Candidate B is now the active factory-program implementation for preset 01.
+### Broad stochastic job: slow population-energy redistribution
+
+The first audible B3 experiment routes the broader stochastic source to Osc Mix at depth 0.045. Osc A and Osc B are same-pitch, independently phased saw populations, so small slow movement between them changes interference density without deliberately moving the fundamental.
+
+A more exact side-voice energy-shape law also exists in SupersawLaw. It redistributes energy between inner and outer beat families symmetrically and includes exact power correction. It remains an A/B candidate rather than being globally hard-wired into every preset.
+
+The rule is: Brown solves local correlated micro-motion; broad stochastic solves slower non-repeating redistribution. Neither is included merely because it is available.
+
+## Stage 6 hypothesis — hybrid phase law
+
+Current candidate A/B uses all-random initial phase. Stage 6 will compare:
+- all random: strongest non-repetition, least repeatable transient
+- all retriggered: strongest repeatability, greatest risk of a fixed comb-like attack
+- hybrid: deterministic centre phase with random outer phases
+
+The hybrid hypothesis is attractive because the centre can supply a reliable transient and pitch cue while the outer population retains non-repeating interference. It must still win by listening and transient/peak efficiency, not by theory alone.
 
 ## Candidate C — conditional engine enrichment
 
-Candidate C is not encoded yet. It is allowed only if measurements show a remaining deficit after A/B. Possible tools:
-- tiny nonlinear/coupled contribution for harmonic density
-- broader stochastic evolution only in sustained upper-spectrum behaviour
-- no SAMPLE unless a specific transient/texture deficit is identified
-
-Candidate C must not be created merely because OMNARIA has more engines available.
+Candidate C is not allowed merely because OMNARIA contains more engines. After Stage 6, FM/PM, nonlinear/NASTY, SAMPLE, wave-terrain or other synthesis mechanisms may enter only when a specific measured acoustic deficit remains and their contribution beats the best B result after loudness matching.
 
 ## Measurements / listening checks
 
@@ -87,21 +116,20 @@ Candidate C must not be created merely because OMNARIA has more engines availabl
 8. Filter opening must remain smooth and energetic.
 9. Remove all FX when comparing oscillator/filter quality.
 10. CPU cost must remain proportionate to the audible gain.
-11. Candidate B must reduce beat periodicity without producing audible vibrato.
-12. Brown contribution must lose if it weakens pitch certainty or transient punch.
-
-## CORE issue discovered by preset 01
-
-Current OMNARIA unison position uses a smooth symmetric spacing function. A later DSP experiment must compare this against a deliberately non-uniform 7-voice detune table based on measured supersaw behaviour. Pitch-detune distribution and stereo-pan distribution must remain separate calculations: a useful frequency-spacing law is not automatically the best stereo law.
+11. Brown must reduce stationary beating without producing audible vibrato.
+12. Broad stochastic motion must add non-repetition without pitch drift, image wander or obvious pumping.
+13. Peak/crest-factor cost must be justified by perceived density.
+14. The sound must retain its identity through mono and mass-listening bandwidth/level conditions.
 
 ## Acceptance gate
 
 Preset 01 is not finished because values exist in code. It passes only after:
 - universal build is green
 - dry OMNARIA CORE is compared against strong Sylenth1 and Spire supersaw references
-- phase mode A/B is judged
-- current smooth detune distribution vs non-uniform distribution is judged
-- Candidate A vs Candidate B is judged level-matched
-- any Candidate C specialist-engine addition must beat the best A/B result rather than merely sound more complex
+- phase mode / hybrid phase A/B is judged
+- Candidate A vs optimised B is judged level-matched
+- Brown-only vs Brown + broad stochastic is judged
+- mono, streaming/small-speaker, stereo and keyboard-range checks pass
+- any Candidate C specialist-engine addition beats the best A/B result rather than merely sounding more complex
 
 Only then may preset 02 be added.
