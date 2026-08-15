@@ -29,6 +29,8 @@ juce_add_plugin(Omnaria
     COPY_PLUGIN_AFTER_BUILD FALSE
 )
 
+juce_generate_juce_header(Omnaria)
+
 target_sources(Omnaria
     PRIVATE
         Source/PluginProcessor.cpp
