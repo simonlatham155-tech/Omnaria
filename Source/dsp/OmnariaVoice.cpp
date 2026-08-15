@@ -1,5 +1,7 @@
 #include "OmnariaVoice.h"
 #include "SupersawLaw.h"
+#include "LayerArchitecture.h"
+#include "TempoGateLaw.h"
 #include <cmath>
 
 namespace omnaria
@@ -24,6 +26,7 @@ void OmnariaVoice::prepare(double sampleRate, int maximumBlockSize)
     subOscillator.setShape(BandlimitedOscillator::Shape::sine);
     nastyCell.prepare(currentSampleRate);
     sampleVoice.prepare(currentSampleRate);
+    resonator.prepare(currentSampleRate);
 
     juce::dsp::ProcessSpec spec { currentSampleRate, static_cast<juce::uint32>(juce::jmax(1, maximumBlockSize)), 2 };
     filterA.prepare(spec); filterB.prepare(spec);
@@ -46,6 +49,7 @@ void OmnariaVoice::prepare(double sampleRate, int maximumBlockSize)
     brownState = stochasticState = stochasticTarget = 0.0f;
     stochasticSamplesUntilTarget = 1;
     momentPhase = 0.0f;
+    gatePhase = 0.0f;
 }
 
 void OmnariaVoice::startNote(int midiNoteNumber, float velocity, juce::SynthesiserSound*, int currentPitchWheelPosition)
@@ -54,6 +58,7 @@ void OmnariaVoice::startNote(int midiNoteNumber, float velocity, juce::Synthesis
     pitchWheel = currentPitchWheelPosition;
     noteVelocity = velocity;
     momentPhase = 0.0f;
+    gatePhase = 0.0f;
     nastyCell.reset();
 
     const bool randomPhase = parameter("phase_mode") >= 0.5f;
@@ -77,6 +82,12 @@ void OmnariaVoice::startNote(int midiNoteNumber, float velocity, juce::Synthesis
     sampleVoice.start(samples.get(), midiNoteNumber, juce::roundToInt(parameter("sample_root")),
                       parameter("sample_start"), parameter("sample_end"), parameter("sample_reverse") >= 0.5f);
 
+    const auto noteHz = static_cast<float>(juce::MidiMessage::getMidiNoteInHertz(midiNoteNumber));
+    resonator.trigger(noteHz, velocity,
+                      juce::jlimit(0.0f, 1.0f, parameter("macro2")),
+                      juce::jlimit(0.03f, 12.0f, parameter("decay")),
+                      juce::jlimit(0.0f, 1.0f, parameter("velocity_timbre")));
+
     filterA.reset(); filterB.reset();
     previousDriveInputL = previousDriveInputR = 0.0f;
     ampEnvelope.noteOn(); filterEnvelope.noteOn();
@@ -95,7 +106,7 @@ void OmnariaVoice::stopNote(float, bool allowTailOff)
     {
         ampEnvelope.reset(); filterEnvelope.reset();
         for (auto& envelope : auxEnvelopes) envelope.reset();
-        nastyCell.reset(); sampleVoice.stop();
+        nastyCell.reset(); sampleVoice.stop(); resonator.reset();
         clearCurrentNote();
     }
 }
@@ -256,7 +267,8 @@ void OmnariaVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int s
     const auto motion = state.motion.load(), energy = state.performanceEnergy.load(), history = state.historyState.load(), phrase = state.phrasePosition.load();
     const auto baseHz = static_cast<float>(juce::MidiMessage::getMidiNoteInHertz(currentMidiNote)) * pitchWheelRatio();
     const auto bRatio = std::pow(2.0f, coarseB / 12.0f);
-    subOscillator.setFrequency(baseHz * std::pow(2.0f, static_cast<float>(subOctave)));
+    const auto subHz = baseHz * std::pow(2.0f, static_cast<float>(subOctave));
+    subOscillator.setFrequency(subHz);
 
     auto baseCutoff = parameter("cutoff");
     baseCutoff *= std::pow(2.0f, (currentMidiNote - 60.0f) / 12.0f * juce::jlimit(0.0f, 1.0f, parameter("keytrack")));
@@ -278,6 +290,8 @@ void OmnariaVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int s
     const auto velocityScale = juce::jlimit(0.25f, 1.75f, 1.0f + velocityTimbre * (noteVelocity - 0.5f) * 1.4f);
     const auto numChannels = outputBuffer.getNumChannels();
     const auto sampleMode = juce::jlimit(0, 2, juce::roundToInt(parameter("sample_mode")));
+    const auto resonatorAmount = juce::jlimit(0.0f, 1.0f, parameter("macro3"));
+    const auto gateAmount = juce::jlimit(0.0f, 1.0f, parameter("macro4"));
 
     for (int sample = 0; sample < numSamples; ++sample)
     {
@@ -307,14 +321,31 @@ void OmnariaVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int s
         for (int i = 0; i < unisonCount; ++i)
         {
             const auto stereoPosition = SupersawLaw::stereoPosition(i, unisonCount);
-            const auto pan = juce::jlimit(-1.0f, 1.0f, stereoPosition * spread);
+            const auto frequencyPosition = SupersawLaw::frequencyPosition(i, unisonCount);
+            const auto ratio = std::pow(2.0f, frequencyPosition * detuneCents / 1200.0f);
+            const auto sourceHz = baseHz * ratio * juce::jmap(mix, 1.0f, bRatio);
+            const auto effectiveSpread = LayerArchitecture::frequencyDependentWidth(spread, sourceHz);
+            const auto pan = juce::jlimit(-1.0f, 1.0f, stereoPosition * effectiveSpread);
             const auto voiceGain = SupersawLaw::voiceGain(i, unisonCount, detuneCents);
             const auto source = juce::jmap(mix, oscillatorA[i].process(), oscillatorB[i].process()) * voiceGain;
             left += source * std::sqrt(0.5f * (1.0f - pan)); right += source * std::sqrt(0.5f * (1.0f + pan));
         }
-        const auto centredSub = subOscillator.process() * subLevel * 0.55f;
+
         const auto noise = (noiseRandom.nextFloat() * 2.0f - 1.0f) * noiseLevel * 0.30f;
-        left += centredSub + noise; right += centredSub + noise;
+        left += noise; right += noise;
+
+        if (resonatorAmount > 0.0001f)
+        {
+            const auto resonantBody = resonator.process() * resonatorAmount * 0.42f;
+            left += resonantBody;
+            right += resonantBody;
+        }
+        else
+        {
+            // Keep resonator state advancing even when inaudible so automation into
+            // the layer does not reveal a frozen/discontinuous body.
+            (void) resonator.process();
+        }
 
         auto randomTexture = stochasticState * 0.7f + brownState * 0.3f;
         const auto samplePair = sampleVoice.process(parameter("sample_tune") + frame.sampleTune, sampleMode,
@@ -361,12 +392,28 @@ void OmnariaVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int s
         left = filterA.processSample(0, left); right = filterA.processSample(1, right);
         if (filterMode == 1) { left = filterB.processSample(0, left); right = filterB.processSample(1, right); }
 
+        // A10: protected sub is generated from its own coherent oscillator and is
+        // recombined after drive, NASTY and filtering. It therefore cannot acquire
+        // stereo cancellation or nonlinear low-mid fog from specialist body layers.
+        const auto protectedSub = subOscillator.process() * subLevel * 0.55f * amp;
+        left += protectedSub;
+        right += protectedSub;
+
+        // A9: rhythm is independent from natural note articulation. Macro 4 is a
+        // temporary default-off activation path until dedicated UI parameters land.
+        gatePhase += TempoGateLaw::phaseIncrement(state.bpm.load(), 0.25f, currentSampleRate);
+        gatePhase -= std::floor(gatePhase);
+        const auto rhythmicGate = TempoGateLaw::gate(gatePhase, 0.56f, 0.035f);
+        const auto gateGain = juce::jmap(gateAmount, 1.0f, rhythmicGate);
+        left *= gateGain;
+        right *= gateGain;
+
         const auto target = startSample + sample;
         if (numChannels > 0) outputBuffer.addSample(0, target, left);
         if (numChannels > 1) outputBuffer.addSample(1, target, right);
     }
 
-    if (! ampEnvelope.isActive()) { sampleVoice.stop(); clearCurrentNote(); }
+    if (! ampEnvelope.isActive()) { sampleVoice.stop(); resonator.reset(); clearCurrentNote(); }
 }
 
 float OmnariaVoice::parameter(const char* id) const noexcept { if (const auto* v = params.getRawParameterValue(id)) return v->load(); return 0.0f; }
