@@ -1,9 +1,8 @@
 #pragma once
 
 #include <JuceHeader.h>
-#include <atomic>
+#include <cmath>
 #include <memory>
-#include <mutex>
 
 namespace omnaria
 {
@@ -19,16 +18,16 @@ class SamplePool
 public:
     void publish(std::shared_ptr<const SampleData> data) noexcept
     {
-        current.store(std::move(data));
+        std::atomic_store_explicit(&current, std::move(data), std::memory_order_release);
     }
 
     std::shared_ptr<const SampleData> get() const noexcept
     {
-        return current.load();
+        return std::atomic_load_explicit(&current, std::memory_order_acquire);
     }
 
 private:
-    std::atomic<std::shared_ptr<const SampleData>> current;
+    mutable std::shared_ptr<const SampleData> current;
 };
 
 class SampleVoice
@@ -60,7 +59,7 @@ public:
     bool isActive() const noexcept { return active && sample != nullptr; }
 
     std::pair<float, float> process(float tuneSemitones, int mode, float positionOffset,
-                                    float scan, float jitter, float& randomBipolar) noexcept
+                                    float scan, float jitter, float randomBipolar) noexcept
     {
         if (! isActive()) return { 0.0f, 0.0f };
 
