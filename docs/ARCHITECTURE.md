@@ -1,50 +1,61 @@
-# OMNARIA / LatWorld Architecture
+# OMNARIA Architecture
 
 ## Product thesis
 
-OMNARIA must be excellent with LatWorld depth set to zero. LatWorld then adds a class of behaviour that fixed-architecture synths do not naturally provide: musical state, history, cooperative timbres, synthesis-architecture evolution and dynamic compute allocation.
+OMNARIA must first be an exceptional flagship synthesizer for electronic music. Experimental shared-state ideas are infrastructure and research until they produce a demonstrably distinct synthesis mechanism.
 
 ## Layer model
 
-### 1. Musical World (shared, control-rate)
-Tracks host tempo, beat, bar, phrase, active notes, pitch classes, note density, energy, harmonic centre, tension and history. This layer is deliberately cheap and shared by every future timbre.
+### 1. CORE voice engine
+High-quality polyphonic oscillator, unison, filter, envelope and drive path. This layer must be competitive on conventional bass, pluck, supersaw, pad and lead sounds before broader synthesis features are counted as advantages.
 
-### 2. World Sound Field (shared representation)
-A common description of the target sound: fundamental/harmonic energy, inharmonic energy, transient/noise content, spectral centroid/width, motion, stereo extent and density. Engines contribute to and render this field rather than behaving as permanently isolated synths.
+### 2. Shared performance state
+A cheap control-rate layer tracks host tempo, beat/bar/phrase position, active notes, pitch classes, note density, performance energy, harmonic centre and limited history. It exists once globally so future features can use host/performance context without duplicating calculations in every voice.
 
-### 3. Synthesis pool
-CORE VA/unison, FM/PM, wavetable, wave-terrain, stochastic, spectral/additive, granular, physical/modal and sample/resynthesis engines. Engines are renderers/material sources, not separate products glued together.
+This is not a claimed synthesis method. It is ordinary engine infrastructure unless future research proves otherwise.
 
-### 4. Timbres / roles
-Future milestone: 8 roles by default (bass, pluck, chords, pad, sequence, lead, texture, FX), each with independent MIDI/output routing but sharing Musical World, World Sound Field and compute budget.
+### 3. Sound-generation families
+Additional engines may be added only when independently strong. Candidate families include:
 
-### 5. Dynamic compute
-Expensive audio-rate renderers are allocated to active musical needs. Idle timbres keep cheap world state but do not retain a full expensive voice engine. Quality modes will cap render budget deterministically.
+- virtual analogue / unison
+- wavetable
+- FM / phase modulation
+- wave-terrain
+- stochastic methods
+- spectral/additive
+- sample playback and multisampling
+- granular
+- physical/modal/resonator
+- resynthesis
 
-## Four LatWorld laws
+The design should avoid forcing all engines to run simultaneously.
 
-1. Everything inhabits a shared World.
-2. The World has memory; past musical events may influence future synthesis.
-3. Synthesis architecture may evolve over musical time.
-4. Musical intention dominates randomness: notes, harmony, performance and producer constraints remain authoritative.
+### 4. Modulation and control
+OMNARIA needs flagship modulation: envelopes, LFOs, macros, drag/drop assignment, visible modulation depth, MIDI learn, MPE/microtuning planning and deterministic automation/state recall.
+
+### 5. Sampling and resynthesis
+Sampling should be a first-class sound-design source rather than an afterthought. Basic sample playback/mapping must be solid before experimental transformations are presented as novel.
+
+### 6. Multitimbral/shared-compute research
+Multi-part operation and shared DSP may be explored where they create genuine workflow or CPU advantages. Conventional multitimbrality does not by itself constitute a new synthesis method.
 
 ## Centre globe contract
 
-The globe is not decorative. Its animation must be driven by engine values only. It exposes phrase phase, world energy, active-note gravity, memory, spectral distribution and evolution. Later it also shows timbral territories and compute migration.
+The globe remains the central visual mechanic, but it must show real values only: phrase phase, performance energy, active-note/harmonic state, history and spectral distribution. Future visual layers must correspond to real DSP or control state rather than invented animation.
 
-## Sampling contract
-
-Sampling is native material. PCM, granular and spectral playback are useful, but the LatWorld-specific operation is ABSORB: analyse a sample into transient, tonal, noise, temporal and spectral traits, then allow those traits to drive/render through other engines. Resynthesis must be able to move from recognisable source to World-derived instrument without relying on a simple A/B crossfade.
-
-## Milestone 0.1 — CORE + World foundation
+## Current milestone — CORE + state foundation
 
 - Playable polyphonic band-limited oscillator engine.
 - Stereo unison with deterministic per-voice spread.
 - Per-voice amp envelope and TPT filter.
 - Host tempo/bar/16-bar phrase tracking.
 - Active-note harmonic centre and energy tracking.
-- Stateful LatWorld memory/evolution/gravity values.
-- Centre globe driven by live World state.
+- Neutral Motion / History / Focus / Coupling experimental state values.
+- Centre globe driven by live engine state.
 - State recall through APVTS.
 
-This milestone deliberately does not claim final Serum/Spire/Sylenth/Pigments/Falcon parity. It creates the architecture on which that quality work can be measured rather than burying the project under early feature count.
+This milestone does not claim Serum/Spire/Sylenth/Pigments/Falcon parity, and it does not claim a new synthesis category. It establishes a testable engineering base from which both flagship quality and deeper mathematical DSP research can proceed.
+
+## Research naming rule
+
+The LatWorld concept has been moved to `docs/research/LATWORLD_CONCEPT.md`. It may only return to product naming if a formal, distinct and useful synthesis mechanism emerges and passes the revival gates recorded there.
