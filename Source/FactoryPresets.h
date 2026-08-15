@@ -28,8 +28,10 @@ inline const std::array<FactoryPreset, 1>& factoryPresets()
             { "oscB_shape", 0 },
             { "osc_mix", 0.32f },
             { "oscB_coarse", 0 },
-            { "phase_mode", 0 },
-            { "phase", 0.07f },
+            // Random/free phase avoids the static comb-like attack produced when
+            // every detuned saw repeatedly starts from the same phase relationship.
+            { "phase_mode", 1 },
+            { "phase", 0.0f },
             { "unison", 7 },
             { "detune", 13.2f },
             { "spread", 0.86f },
