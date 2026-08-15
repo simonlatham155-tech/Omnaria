@@ -39,6 +39,21 @@ public:
     void paint(juce::Graphics&) override;
     void resized() override;
 
+    // The editor constructor creates the modulation controls dynamically in its body.
+    // Calling Component::setSize before those unique_ptrs exist causes JUCE to invoke
+    // resized() immediately, which used to dereference null controls. Queue the initial
+    // size change until after construction has returned; the constructor's later direct
+    // resized() calls are then safe and the queued size establishes the real host bounds.
+    void setSize(int width, int height)
+    {
+        juce::Component::SafePointer<OmnariaAudioProcessorEditor> safeThis(this);
+        juce::MessageManager::callAsync([safeThis, width, height]
+        {
+            if (safeThis != nullptr)
+                safeThis->juce::AudioProcessorEditor::setSize(width, height);
+        });
+    }
+
 private:
     void showSpecialistPage(int page);
     void refreshSampleName();
