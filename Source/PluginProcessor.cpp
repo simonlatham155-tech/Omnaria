@@ -9,7 +9,6 @@ OmnariaAudioProcessor::OmnariaAudioProcessor()
 {
     for (int i = 0; i < 16; ++i)
         synthesiser.addVoice(new omnaria::OmnariaVoice(parameters, engineState));
-
     synthesiser.addSound(new omnaria::OmnariaSound());
     synthesiser.setNoteStealingEnabled(true);
 }
@@ -51,12 +50,12 @@ juce::AudioProcessorValueTreeState::ParameterLayout OmnariaAudioProcessor::creat
     layout.push_back(std::make_unique<juce::AudioParameterFloat>("sustain", "Sustain", juce::NormalisableRange<float>(0.0f, 1.0f), 0.76f));
     layout.push_back(std::make_unique<juce::AudioParameterFloat>("release", "Release", juce::NormalisableRange<float>(0.005f, 20.0f, 0.0f, 0.25f), 0.75f));
 
-    // Phase 2: one modulation language shared by CORE and later specialist engines.
     for (int i = 1; i <= 4; ++i)
     {
         const auto suffix = juce::String(i);
         layout.push_back(std::make_unique<juce::AudioParameterFloat>("lfo" + suffix + "_rate", "LFO " + suffix + " Rate", juce::NormalisableRange<float>(0.01f, 30.0f, 0.0f, 0.25f), i == 1 ? 1.0f : 0.25f * static_cast<float>(i)));
         layout.push_back(std::make_unique<juce::AudioParameterChoice>("lfo" + suffix + "_mode", "LFO " + suffix + " Mode", juce::StringArray { "Free", "Retrig", "One Shot" }, 1));
+        layout.push_back(std::make_unique<juce::AudioParameterChoice>("lfo" + suffix + "_sync", "LFO " + suffix + " Sync", juce::StringArray { "Off", "4/1", "2/1", "1/1", "1/2", "1/4", "1/8", "1/16" }, 0));
         layout.push_back(std::make_unique<juce::AudioParameterFloat>("macro" + suffix, "Macro " + suffix, juce::NormalisableRange<float>(0.0f, 1.0f), 0.0f));
     }
 
@@ -69,8 +68,18 @@ juce::AudioProcessorValueTreeState::ParameterLayout OmnariaAudioProcessor::creat
         layout.push_back(std::make_unique<juce::AudioParameterFloat>("env" + suffix + "_release", "Env " + suffix + " Release", juce::NormalisableRange<float>(0.005f, 20.0f, 0.0f, 0.25f), 0.25f));
     }
 
+    // Phase 3 NASTY laboratory. All controls are normal preset parameters and modulation targets.
+    layout.push_back(std::make_unique<juce::AudioParameterChoice>("nasty_model", "NASTY Model", juce::StringArray { "Fold", "Feedback", "Coupled", "Duffing" }, 0));
+    layout.push_back(std::make_unique<juce::AudioParameterFloat>("nasty_amount", "NASTY Amount", juce::NormalisableRange<float>(0.0f, 1.0f), 0.0f));
+    layout.push_back(std::make_unique<juce::AudioParameterFloat>("nasty_deform", "NASTY Deform", juce::NormalisableRange<float>(0.0f, 1.0f), 0.35f));
+    layout.push_back(std::make_unique<juce::AudioParameterFloat>("nasty_feedback", "NASTY Feedback", juce::NormalisableRange<float>(0.0f, 0.985f), 0.20f));
+    layout.push_back(std::make_unique<juce::AudioParameterFloat>("nasty_coupling", "NASTY Coupling", juce::NormalisableRange<float>(0.0f, 1.0f), 0.25f));
+    layout.push_back(std::make_unique<juce::AudioParameterFloat>("nasty_energy", "NASTY Energy", juce::NormalisableRange<float>(0.0f, 1.0f), 0.35f));
+    layout.push_back(std::make_unique<juce::AudioParameterFloat>("nasty_damping", "NASTY Damping", juce::NormalisableRange<float>(0.02f, 1.0f), 0.55f));
+    layout.push_back(std::make_unique<juce::AudioParameterFloat>("nasty_moment", "NASTY Moment", juce::NormalisableRange<float>(0.0f, 1.0f), 0.0f));
+
     const juce::StringArray modSources { "None", "LFO 1", "LFO 2", "LFO 3", "LFO 4", "Env 1", "Env 2", "Env 3", "Velocity", "Key", "Mod Wheel", "Aftertouch", "Macro 1", "Macro 2", "Macro 3", "Macro 4", "Brown", "Stochastic" };
-    const juce::StringArray modDestinations { "None", "Pitch", "Cutoff", "Resonance", "Osc Mix", "Detune", "Spread", "Drive", "Pulse Width" };
+    const juce::StringArray modDestinations { "None", "Pitch", "Cutoff", "Resonance", "Osc Mix", "Detune", "Spread", "Drive", "Pulse Width", "NASTY Amount", "NASTY Deform", "NASTY Feedback", "NASTY Coupling", "NASTY Energy", "NASTY Damping", "NASTY Moment" };
     for (int i = 1; i <= 4; ++i)
     {
         const auto suffix = juce::String(i);
@@ -92,11 +101,9 @@ void OmnariaAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock
 {
     stateEngine.prepare(sampleRate);
     synthesiser.setCurrentPlaybackSampleRate(sampleRate);
-
     for (int i = 0; i < synthesiser.getNumVoices(); ++i)
         if (auto* voice = dynamic_cast<omnaria::OmnariaVoice*>(synthesiser.getVoice(i)))
             voice->prepare(sampleRate, samplesPerBlock);
-
     outputGain.prepare({ sampleRate, static_cast<juce::uint32>(juce::jmax(1, samplesPerBlock)), 2 });
     outputGain.setRampDurationSeconds(0.02);
 }
@@ -117,37 +124,27 @@ void OmnariaAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce:
 {
     juce::ScopedNoDenormals noDenormals;
     buffer.clear();
-
-    stateEngine.processBlock(midi,
-                             getPlayHead(),
-                             buffer.getNumSamples(),
+    stateEngine.processBlock(midi, getPlayHead(), buffer.getNumSamples(),
                              parameters.getRawParameterValue("motion")->load(),
                              parameters.getRawParameterValue("history")->load(),
                              parameters.getRawParameterValue("focus")->load(),
                              parameters.getRawParameterValue("coupling")->load());
-
     synthesiser.renderNextBlock(buffer, midi, 0, buffer.getNumSamples());
-
     outputGain.setGainDecibels(parameters.getRawParameterValue("output")->load());
     juce::dsp::AudioBlock<float> block(buffer);
     outputGain.process(juce::dsp::ProcessContextReplacing<float>(block));
 }
 
-juce::AudioProcessorEditor* OmnariaAudioProcessor::createEditor()
-{
-    return new OmnariaAudioProcessorEditor(*this);
-}
+juce::AudioProcessorEditor* OmnariaAudioProcessor::createEditor() { return new OmnariaAudioProcessorEditor(*this); }
 
 void OmnariaAudioProcessor::getStateInformation(juce::MemoryBlock& destData)
 {
-    if (auto xml = parameters.copyState().createXml())
-        copyXmlToBinary(*xml, destData);
+    if (auto xml = parameters.copyState().createXml()) copyXmlToBinary(*xml, destData);
 }
 
 void OmnariaAudioProcessor::setStateInformation(const void* data, int sizeInBytes)
 {
-    if (auto xml = getXmlFromBinary(data, sizeInBytes))
-        parameters.replaceState(juce::ValueTree::fromXml(*xml));
+    if (auto xml = getXmlFromBinary(data, sizeInBytes)) parameters.replaceState(juce::ValueTree::fromXml(*xml));
 }
 
 void OmnariaAudioProcessor::setParameterFromActualValue(const juce::String& id, float actualValue)
@@ -166,8 +163,7 @@ void OmnariaAudioProcessor::randomiseDiscoverable()
     const auto uniform = [&random](float low, float high) { return low + random.nextFloat() * (high - low); };
     const auto current = [this](const juce::String& id)
     {
-        if (auto* parameter = parameters.getParameter(id))
-            return parameter->convertFrom0to1(parameter->getValue());
+        if (auto* parameter = parameters.getParameter(id)) return parameter->convertFrom0to1(parameter->getValue());
         return 0.0f;
     };
     const auto mutateLinear = [&] (const juce::String& id, float amount, float low, float high)
@@ -194,14 +190,12 @@ void OmnariaAudioProcessor::randomiseDiscoverable()
     mutateLinear("spread", 0.12f, 0.0f, 1.0f);
     mutateLinear("sub_level", 0.10f, 0.0f, 1.0f);
     mutateLinear("noise_level", 0.05f, 0.0f, 0.5f);
-
     mutateRatio("cutoff", 0.65f, 40.0f, 19000.0f);
     mutateRatio("resonance", 0.45f, 0.2f, 12.0f);
     mutateLinear("keytrack", 0.12f, 0.0f, 1.0f);
     mutateLinear("drive", 3.5f, 0.0f, 24.0f);
     mutateLinear("filter_env_amt", 0.75f, -6.0f, 6.0f);
     mutateLinear("velocity_timbre", 0.12f, 0.0f, 1.0f);
-
     mutateRatio("filter_attack", 0.60f, 0.001f, 10.0f);
     mutateRatio("filter_decay", 0.60f, 0.001f, 10.0f);
     mutateLinear("filter_sustain", 0.12f, 0.0f, 1.0f);
@@ -214,13 +208,17 @@ void OmnariaAudioProcessor::randomiseDiscoverable()
     mutateLinear("history", 0.12f, 0.0f, 1.0f);
     mutateLinear("focus", 0.10f, 0.0f, 1.0f);
     mutateLinear("coupling", 0.12f, 0.0f, 1.0f);
+    for (int i = 1; i <= 4; ++i) mutateLinear("macro" + juce::String(i), 0.12f, 0.0f, 1.0f);
 
-    // Discover may move macro values, but does not silently invent modulation routes yet.
-    for (int i = 1; i <= 4; ++i)
-        mutateLinear("macro" + juce::String(i), 0.12f, 0.0f, 1.0f);
+    // Phase 3: mutate the audible NASTY controls, but never change output gain.
+    if (random.nextFloat() < 0.18f) setParameterFromActualValue("nasty_model", static_cast<float>(random.nextInt(4)));
+    mutateLinear("nasty_amount", 0.14f, 0.0f, 1.0f);
+    mutateLinear("nasty_deform", 0.16f, 0.0f, 1.0f);
+    mutateLinear("nasty_feedback", 0.12f, 0.0f, 0.985f);
+    mutateLinear("nasty_coupling", 0.14f, 0.0f, 1.0f);
+    mutateLinear("nasty_energy", 0.14f, 0.0f, 1.0f);
+    mutateLinear("nasty_damping", 0.12f, 0.02f, 1.0f);
+    mutateLinear("nasty_moment", 0.14f, 0.0f, 1.0f);
 }
 
-juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
-{
-    return new OmnariaAudioProcessor();
-}
+juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter() { return new OmnariaAudioProcessor(); }
