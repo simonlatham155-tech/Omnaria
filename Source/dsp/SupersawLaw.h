@@ -53,6 +53,27 @@ struct SupersawLaw
         return std::copysign(std::pow(std::abs(linear), 1.10f), linear);
     }
 
+    // A fixed cents spread causes absolute beat rate to rise with note frequency:
+    // deltaF = f0 * (2^(c/1200)-1). For a lead this can become buzzy in the top
+    // octaves and too static in the low range. Blend constant-cents behaviour with
+    // an A4-referenced constant-Hz target, then clamp so the patch keeps its identity.
+    static float pitchAwareDetune(float publicDetuneCents, float baseHz, float constantHzBlend = 0.58f) noexcept
+    {
+        publicDetuneCents = juce::jmax(0.0f, publicDetuneCents);
+        baseHz = juce::jmax(20.0f, baseHz);
+        constantHzBlend = juce::jlimit(0.0f, 1.0f, constantHzBlend);
+
+        constexpr float referenceHz = 440.0f;
+        const auto referenceBeatHz = referenceHz * (std::pow(2.0f, publicDetuneCents / 1200.0f) - 1.0f);
+        const auto constantHzCents = 1200.0f * std::log2(1.0f + referenceBeatHz / baseHz);
+        const auto blended = juce::jmap(constantHzBlend, publicDetuneCents, constantHzCents);
+
+        // Avoid huge low-note spreads or an over-tight top octave.
+        const auto lower = publicDetuneCents * 0.62f;
+        const auto upper = publicDetuneCents * 1.55f;
+        return juce::jlimit(lower, upper, blended);
+    }
+
     // Preserve approximately the same expected incoherent power as the previous
     // equal-gain normaliser, so the new weighting cannot 'win' just by being louder.
     static float voiceGain(int voiceIndex, int voiceCount, float detuneCents) noexcept
@@ -62,8 +83,6 @@ struct SupersawLaw
 
         if (voiceCount == 7 && voiceIndex >= 0 && voiceIndex < 7)
         {
-            // Old expected incoherent power = N * g^2. Multiply our unit-power
-            // weight vector by sqrt(N) * g to retain that same expected power.
             const auto referencePowerScale = std::sqrt(static_cast<float>(voiceCount)) * oldPerVoiceGain;
             return powerWeights[static_cast<size_t>(voiceIndex)] * referencePowerScale;
         }
