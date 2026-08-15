@@ -1,4 +1,5 @@
 #include "OmnariaStateEngine.h"
+#include "GlideLaw.h"
 #include <cmath>
 
 namespace omnaria
@@ -19,6 +20,12 @@ void OmnariaStateEngine::reset()
     state.activeNotes.store(0);
     state.performanceEnergy.store(0.0f);
     state.historyState.store(0.0f);
+    state.previousNoteOn.store(60);
+    state.targetNoteOn.store(60);
+    state.glideIntervalCents.store(0.0f);
+    state.glideDirection.store(0.0f);
+    state.glideExcitation.store(0.0f);
+    state.noteOnSerial.store(0);
 }
 
 void OmnariaStateEngine::processBlock(const juce::MidiBuffer& midi,
@@ -47,6 +54,15 @@ void OmnariaStateEngine::consumeMidi(const juce::MidiBuffer& midi)
         if (message.isNoteOn())
         {
             const auto note = juce::jlimit(0, 127, message.getNoteNumber());
+            const auto previous = state.targetNoteOn.load();
+            state.previousNoteOn.store(previous);
+            state.targetNoteOn.store(note);
+            const auto interval = GlideLaw::intervalCents(previous, note);
+            state.glideIntervalCents.store(interval);
+            state.glideDirection.store(GlideLaw::direction(previous, note));
+            state.glideExcitation.store(GlideLaw::intervalExcitation(interval));
+            state.noteOnSerial.fetch_add(1);
+
             heldNotes[static_cast<size_t>(note)] = true;
             noteVelocity[static_cast<size_t>(note)] = message.getFloatVelocity();
         }
