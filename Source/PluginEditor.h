@@ -61,10 +61,10 @@ private:
     ParamKnob sustain;
     ParamKnob release;
 
-    ParamKnob evolution;
-    ParamKnob memory;
-    ParamKnob gravity;
-    ParamKnob interaction;
+    ParamKnob motion;
+    ParamKnob history;
+    ParamKnob focus;
+    ParamKnob coupling;
     ParamKnob output;
 
     juce::Label title;
