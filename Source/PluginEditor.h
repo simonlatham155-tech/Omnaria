@@ -37,54 +37,35 @@ public:
     void resized() override;
 
 private:
+    void showSpecialistPage(bool samplePage);
+    void refreshSampleName();
+
     OmnariaAudioProcessor& processor;
     omnaria::WorldGlobe globe;
 
-    ParamCombo oscAShape;
-    ParamCombo oscBShape;
-    ParamCombo phaseMode;
-    ParamKnob oscMix;
-    ParamKnob oscBCoarse;
-    ParamKnob pulseWidth;
-    ParamKnob phase;
-    ParamKnob unison;
-    ParamKnob detune;
-    ParamKnob spread;
-    ParamKnob subLevel;
-    ParamKnob subOctave;
-    ParamKnob noiseLevel;
-
+    ParamCombo oscAShape, oscBShape, phaseMode;
+    ParamKnob oscMix, oscBCoarse, pulseWidth, phase, unison, detune, spread, subLevel, subOctave, noiseLevel;
     ParamCombo filterMode;
-    ParamKnob cutoff;
-    ParamKnob resonance;
-    ParamKnob keytrack;
-    ParamKnob drive;
-    ParamKnob filterEnvAmount;
-    ParamKnob velocityTimbre;
-    ParamKnob filterAttack;
-    ParamKnob filterDecay;
-    ParamKnob filterSustain;
-    ParamKnob filterRelease;
-    ParamKnob attack;
-    ParamKnob decay;
-    ParamKnob sustain;
-    ParamKnob release;
+    ParamKnob cutoff, resonance, keytrack, drive, filterEnvAmount, velocityTimbre;
+    ParamKnob filterAttack, filterDecay, filterSustain, filterRelease, attack, decay, sustain, release;
+    ParamKnob motion, history, focus, coupling, output;
 
-    ParamKnob motion;
-    ParamKnob history;
-    ParamKnob focus;
-    ParamKnob coupling;
-    ParamKnob output;
-
-    // Compact Phase 3 surface: depth without another permanently expanded matrix.
     ParamCombo nastyModel;
-    ParamKnob nastyAmount;
-    ParamKnob nastyDeform;
-    ParamKnob nastyFeedback;
-    ParamKnob nastyCoupling;
-    ParamKnob nastyEnergy;
-    ParamKnob nastyDamping;
-    ParamKnob nastyMoment;
+    ParamKnob nastyAmount, nastyDeform, nastyFeedback, nastyCoupling, nastyEnergy, nastyDamping, nastyMoment;
+
+    // Phase 4 SAMPLE shares the specialist card with NASTY.
+    ParamCombo sampleMode;
+    ParamKnob sampleLevel, sampleTune, sampleStart, sampleEnd, samplePosition, sampleScan, sampleJitter;
+    juce::ToggleButton sampleReverse { "REVERSE" };
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> sampleReverseAttachment;
+    juce::TextButton loadSampleButton { "LOAD" };
+    juce::TextButton captureSampleButton { "RESAMPLE" };
+    juce::Label sampleNameLabel;
+    std::unique_ptr<juce::FileChooser> sampleChooser;
+
+    juce::TextButton nastyTabButton { "NASTY" };
+    juce::TextButton sampleTabButton { "SAMPLE" };
+    bool showingSamplePage { false };
 
     std::array<std::unique_ptr<ParamKnob>, 4> lfoRates;
     std::array<std::unique_ptr<ParamCombo>, 4> lfoModes;
