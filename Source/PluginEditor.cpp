@@ -1,4 +1,5 @@
 #include "PluginEditor.h"
+#include <array>
 
 namespace
 {
@@ -106,10 +107,14 @@ OmnariaAudioProcessorEditor::OmnariaAudioProcessorEditor(OmnariaAudioProcessor& 
     subtitle.setColour(juce::Label::textColourId, accent.withAlpha(0.92f));
     addAndMakeVisible(subtitle);
 
-    for (auto* component : { static_cast<juce::Component*>(&globe),
-                             &oscAShape, &oscBShape, &oscMix, &oscBCoarse, &unison, &detune, &spread,
-                             &cutoff, &resonance, &drive, &attack, &decay, &sustain, &release,
-                             &evolution, &memory, &gravity, &interaction, &output })
+    const std::array<juce::Component*, 20> components {
+        &globe,
+        &oscAShape, &oscBShape, &oscMix, &oscBCoarse, &unison, &detune, &spread,
+        &cutoff, &resonance, &drive, &attack, &decay, &sustain, &release,
+        &evolution, &memory, &gravity, &interaction, &output
+    };
+
+    for (auto* component : components)
         addAndMakeVisible(*component);
 
     discoverButton.setColour(juce::TextButton::buttonColourId, accent.withAlpha(0.22f));
@@ -147,11 +152,9 @@ void OmnariaAudioProcessorEditor::paint(juce::Graphics& g)
     g.drawText("FILTER / AMP", right.withTrimmedLeft(14.0f).removeFromTop(24.0f), juce::Justification::centredLeft);
     g.drawText("LATWORLD", worldStrip.withTrimmedLeft(14.0f).removeFromTop(24.0f), juce::Justification::centredLeft);
 
-    // LATHAMAUDIO brand: LATHAM light / AUDIO bold.
     g.setColour(juce::Colours::white.withAlpha(0.72f));
     g.setFont(juce::FontOptions(15.0f));
-    const juce::String lathamText("LATHAM");
-    g.drawText(lathamText, 20, 20, 90, 24, juce::Justification::centredLeft, false);
+    g.drawText("LATHAM", 20, 20, 90, 24, juce::Justification::centredLeft, false);
     g.setFont(juce::FontOptions(15.0f, juce::Font::bold));
     g.drawText("AUDIO", 78, 20, 74, 24, juce::Justification::centredLeft, false);
 }
