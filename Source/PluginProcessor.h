@@ -1,7 +1,7 @@
 #pragma once
 
 #include <JuceHeader.h>
-#include "dsp/LatWorldEngine.h"
+#include "dsp/OmnariaStateEngine.h"
 #include "dsp/OmnariaVoice.h"
 
 class OmnariaAudioProcessor final : public juce::AudioProcessor
@@ -34,7 +34,7 @@ public:
     void setStateInformation(const void* data, int sizeInBytes) override;
 
     void randomiseDiscoverable();
-    const omnaria::LatWorldState& getWorldState() const noexcept { return worldState; }
+    const omnaria::OmnariaState& getEngineState() const noexcept { return engineState; }
 
     juce::AudioProcessorValueTreeState parameters;
 
@@ -42,8 +42,8 @@ private:
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
     void setParameterFromActualValue(const juce::String& id, float actualValue);
 
-    omnaria::LatWorldState worldState;
-    omnaria::LatWorldEngine worldEngine;
+    omnaria::OmnariaState engineState;
+    omnaria::OmnariaStateEngine stateEngine;
     juce::Synthesiser synthesiser;
     juce::dsp::Gain<float> outputGain;
 
