@@ -36,9 +36,9 @@ target_sources(Omnaria
         Source/PluginEditor.cpp
         Source/PluginEditor.h
         Source/dsp/BandlimitedOscillator.h
-        Source/dsp/LatWorldState.h
-        Source/dsp/LatWorldEngine.cpp
-        Source/dsp/LatWorldEngine.h
+        Source/dsp/OmnariaState.h
+        Source/dsp/OmnariaStateEngine.cpp
+        Source/dsp/OmnariaStateEngine.h
         Source/dsp/OmnariaVoice.cpp
         Source/dsp/OmnariaVoice.h
         Source/ui/WorldGlobe.cpp
