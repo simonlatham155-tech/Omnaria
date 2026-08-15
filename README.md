@@ -1,22 +1,26 @@
 # OMNARIA
 
-**LATHAMAUDIO flagship synthesizer — powered by LatWorld Synthesis.**
+**LATHAMAUDIO flagship synthesizer.**
 
-OMNARIA is being designed as a production-first electronic-music instrument: the ordinary sounds must compete with the best modern synths before the LatWorld engine is allowed to count as an advantage.
+OMNARIA is being designed as a production-first electronic-music instrument. Its ordinary sounds must compete directly with the best modern synths on tone, workflow and CPU before experimental ideas are allowed to count as advantages.
 
 ## Product rule
 
-OMNARIA is not a collection of synthesis engines hidden behind a large interface. LatWorld is a shared musical world in which synthesis sources, timbres and eventually samples can exchange state, spectral territory and compute resources.
+OMNARIA does not claim a new synthesis method at this stage. It is a flagship synthesizer and research platform. If development produces a mathematically distinct synthesis engine, that engine will be named only after its mechanism is defined, tested and shown to be genuinely different from conventional synthesis plus modulation/routing.
 
 ## Non-negotiable release gates
 
 - Core oscillators/unison must be clean, wide, punchy and CPU-conscious.
-- Bass, pluck, supersaw, pad, lead and sequence presets must stand on their own with Evolution and Interaction at zero.
-- LatWorld controls must produce musically useful behaviour, not decorative randomness.
-- The centre globe must visualise real engine state.
-- Sampling/resynthesis is native to LatWorld, not a bolted-on file player.
-- Multitimbrality and shared compute are architectural requirements.
+- Bass, pluck, supersaw, pad, lead and sequence presets must stand on their own without experimental state processing.
+- Filters, envelopes, modulation and effects must meet flagship quality rather than prototype quality.
+- The centre globe must visualise real engine/performance state rather than decorative animation.
+- Sampling/resynthesis must be integrated as a first-class sound-design system.
+- Multitimbrality and shared-compute opportunities may be explored where they improve real production use.
 - MIDI learn, automation, preset management and DAW recall are product requirements.
 - No flagship release based on feature-count parity alone.
 
-The first engineering milestone is the CORE + LatWorld foundation: a high-quality playable voice engine, host musical-state tracking, stateful World mechanics, a real-state globe visualiser and an architecture that can expand into cooperative multitimbrality and native sampling without rewriting the instrument.
+## Current milestone
+
+The first engineering milestone is the CORE + state foundation: a high-quality playable voice engine, host musical-state tracking, a real-state globe visualiser and an architecture that can expand into modern modulation, sampling, additional synthesis engines and deeper DSP research without rewriting the instrument.
+
+The previously discussed **LatWorld** idea is preserved only as an internal research hypothesis in `docs/research/LATWORLD_CONCEPT.md`. It is not currently part of OMNARIA's product description.
