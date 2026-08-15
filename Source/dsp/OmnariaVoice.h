@@ -35,6 +35,7 @@ private:
     BandlimitedOscillator::Shape shapeForIndex(int index) const noexcept;
     float pitchWheelRatio() const noexcept;
     void configureFilterTypes(int mode);
+    static float antialiasedTanh(float x, float& previousX) noexcept;
 
     juce::AudioProcessorValueTreeState& params;
     const OmnariaState& state;
@@ -60,5 +61,7 @@ private:
     int pitchWheel { 8192 };
     int activeFilterMode { -1 };
     float noteVelocity { 0.0f };
+    float previousDriveInputL { 0.0f };
+    float previousDriveInputR { 0.0f };
 };
 } // namespace omnaria
