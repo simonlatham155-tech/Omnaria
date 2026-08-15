@@ -56,6 +56,13 @@ private:
     ParamKnob cutoff;
     ParamKnob resonance;
     ParamKnob drive;
+    ParamKnob filterEnvAmount;
+    ParamKnob velocityTimbre;
+    ParamKnob filterAttack;
+    ParamKnob filterDecay;
+    ParamKnob filterSustain;
+    ParamKnob filterRelease;
+
     ParamKnob attack;
     ParamKnob decay;
     ParamKnob sustain;
