@@ -3,6 +3,7 @@
 #include <JuceHeader.h>
 #include <array>
 #include "BandlimitedOscillator.h"
+#include "NastyCell.h"
 #include "OmnariaState.h"
 
 namespace omnaria
@@ -46,6 +47,13 @@ private:
         float spreadOffset { 0.0f };
         float driveDb { 0.0f };
         float pulseWidthOffset { 0.0f };
+        float nastyAmount { 0.0f };
+        float nastyDeform { 0.0f };
+        float nastyFeedback { 0.0f };
+        float nastyCoupling { 0.0f };
+        float nastyEnergy { 0.0f };
+        float nastyDamping { 0.0f };
+        float nastyMoment { 0.0f };
     };
 
     float parameter(const char* parameterID) const noexcept;
@@ -60,6 +68,7 @@ private:
     void advanceStochasticSources();
     float modulationSourceValue(int sourceIndex) const noexcept;
     ModFrame buildModFrame() const noexcept;
+    float momentEnvelope(float amount) noexcept;
 
     juce::AudioProcessorValueTreeState& params;
     const OmnariaState& state;
@@ -67,6 +76,7 @@ private:
     std::array<BandlimitedOscillator, maxUnison> oscillatorA;
     std::array<BandlimitedOscillator, maxUnison> oscillatorB;
     BandlimitedOscillator subOscillator;
+    NastyCell nastyCell;
 
     juce::dsp::StateVariableTPTFilter<float> filterA;
     juce::dsp::StateVariableTPTFilter<float> filterB;
@@ -97,6 +107,7 @@ private:
     float stochasticState { 0.0f };
     float stochasticTarget { 0.0f };
     int stochasticSamplesUntilTarget { 1 };
+    float momentPhase { 0.0f };
     float previousDriveInputL { 0.0f };
     float previousDriveInputR { 0.0f };
 };
