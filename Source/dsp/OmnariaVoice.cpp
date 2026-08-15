@@ -2,6 +2,7 @@
 #include "SupersawLaw.h"
 #include "LayerArchitecture.h"
 #include "TempoGateLaw.h"
+#include "GlideLaw.h"
 #include <cmath>
 
 namespace omnaria
@@ -31,6 +32,13 @@ void OmnariaVoice::prepare(double sampleRate, int maximumBlockSize)
     juce::dsp::ProcessSpec spec { currentSampleRate, static_cast<juce::uint32>(juce::jmax(1, maximumBlockSize)), 2 };
     filterA.prepare(spec); filterB.prepare(spec);
     filterA.reset(); filterB.reset();
+
+    juce::dsp::ProcessSpec monoSpec { currentSampleRate, static_cast<juce::uint32>(juce::jmax(1, maximumBlockSize)), 1 };
+    formantL.prepare(monoSpec); formantR.prepare(monoSpec);
+    formantL.setType(juce::dsp::StateVariableTPTFilterType::bandpass);
+    formantR.setType(juce::dsp::StateVariableTPTFilterType::bandpass);
+    formantL.reset(); formantR.reset();
+
     ampEnvelope.setSampleRate(currentSampleRate);
     filterEnvelope.setSampleRate(currentSampleRate);
     for (auto& envelope : auxEnvelopes) envelope.setSampleRate(currentSampleRate);
@@ -50,6 +58,10 @@ void OmnariaVoice::prepare(double sampleRate, int maximumBlockSize)
     stochasticSamplesUntilTarget = 1;
     momentPhase = 0.0f;
     gatePhase = 0.0f;
+    glideElapsedSeconds = 0.0f;
+    glideStartCents = 0.0f;
+    pmCarrierPhase = pmModPhase = 0.0f;
+    voiceNoteSerial = 0;
 }
 
 void OmnariaVoice::startNote(int midiNoteNumber, float velocity, juce::SynthesiserSound*, int currentPitchWheelPosition)
@@ -59,6 +71,10 @@ void OmnariaVoice::startNote(int midiNoteNumber, float velocity, juce::Synthesis
     noteVelocity = velocity;
     momentPhase = 0.0f;
     gatePhase = 0.0f;
+    glideElapsedSeconds = 0.0f;
+    glideStartCents = -state.glideIntervalCents.load();
+    voiceNoteSerial = state.noteOnSerial.load();
+    pmCarrierPhase = pmModPhase = 0.0f;
     nastyCell.reset();
 
     const bool randomPhase = parameter("phase_mode") >= 0.5f;
@@ -84,11 +100,12 @@ void OmnariaVoice::startNote(int midiNoteNumber, float velocity, juce::Synthesis
 
     const auto noteHz = static_cast<float>(juce::MidiMessage::getMidiNoteInHertz(midiNoteNumber));
     resonator.trigger(noteHz, velocity,
-                      juce::jlimit(0.0f, 1.0f, parameter("macro2")),
+                      juce::jlimit(0.0f, 1.0f, parameter("velocity_timbre")),
                       juce::jlimit(0.03f, 12.0f, parameter("decay")),
                       juce::jlimit(0.0f, 1.0f, parameter("velocity_timbre")));
 
     filterA.reset(); filterB.reset();
+    formantL.reset(); formantR.reset();
     previousDriveInputL = previousDriveInputR = 0.0f;
     ampEnvelope.noteOn(); filterEnvelope.noteOn();
     configureAuxEnvelopes();
@@ -248,6 +265,17 @@ void OmnariaVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int s
 {
     if (! isVoiceActive()) return;
 
+    const auto monoGlideAmount = juce::jlimit(0.0f, 1.0f, parameter("macro1"));
+    if (monoGlideAmount > 0.001f && currentMidiNote != state.targetNoteOn.load())
+    {
+        ampEnvelope.reset();
+        filterEnvelope.reset();
+        sampleVoice.stop();
+        resonator.reset();
+        clearCurrentNote();
+        return;
+    }
+
     const auto shapeA = shapeForIndex(juce::roundToInt(parameter("oscA_shape")));
     const auto shapeB = shapeForIndex(juce::roundToInt(parameter("oscB_shape")));
     const auto coarseB = parameter("oscB_coarse");
@@ -265,10 +293,8 @@ void OmnariaVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int s
     configureAuxEnvelopes();
 
     const auto motion = state.motion.load(), energy = state.performanceEnergy.load(), history = state.historyState.load(), phrase = state.phrasePosition.load();
-    const auto baseHz = static_cast<float>(juce::MidiMessage::getMidiNoteInHertz(currentMidiNote)) * pitchWheelRatio();
+    const auto targetBaseHz = static_cast<float>(juce::MidiMessage::getMidiNoteInHertz(currentMidiNote)) * pitchWheelRatio();
     const auto bRatio = std::pow(2.0f, coarseB / 12.0f);
-    const auto subHz = baseHz * std::pow(2.0f, static_cast<float>(subOctave));
-    subOscillator.setFrequency(subHz);
 
     auto baseCutoff = parameter("cutoff");
     baseCutoff *= std::pow(2.0f, (currentMidiNote - 60.0f) / 12.0f * juce::jlimit(0.0f, 1.0f, parameter("keytrack")));
@@ -290,16 +316,31 @@ void OmnariaVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int s
     const auto velocityScale = juce::jlimit(0.25f, 1.75f, 1.0f + velocityTimbre * (noteVelocity - 0.5f) * 1.4f);
     const auto numChannels = outputBuffer.getNumChannels();
     const auto sampleMode = juce::jlimit(0, 2, juce::roundToInt(parameter("sample_mode")));
+    const auto pmAmount = juce::jlimit(0.0f, 1.0f, parameter("macro2"));
     const auto resonatorAmount = juce::jlimit(0.0f, 1.0f, parameter("macro3"));
     const auto gateAmount = juce::jlimit(0.0f, 1.0f, parameter("macro4"));
+    const auto formantAmount = juce::jlimit(0.0f, 1.0f, parameter("coupling"));
+    const auto glideTau = 0.018f + monoGlideAmount * 0.22f;
+    const auto coarseSyncDemand = juce::jlimit(0.0f, 1.0f, (std::abs(coarseB) - 7.0f) / 17.0f);
+    const auto syncAmount = pmAmount * coarseSyncDemand;
 
     for (int sample = 0; sample < numSamples; ++sample)
     {
         advanceLfos(); advanceStochasticSources();
         for (int i = 0; i < auxEnvelopeCount; ++i) auxEnvelopeValues[i] = auxEnvelopes[i].getNextSample();
         const auto frame = buildModFrame();
+
+        float residualCents = 0.0f;
+        float glideVelocity = 0.0f;
+        if (monoGlideAmount > 0.001f)
+        {
+            residualCents = GlideLaw::centsAtTime(glideStartCents, glideElapsedSeconds, glideTau);
+            glideVelocity = GlideLaw::normalisedGestureVelocity(residualCents, glideTau);
+            glideElapsedSeconds += 1.0f / static_cast<float>(currentSampleRate);
+        }
+        const auto currentBaseHz = GlideLaw::frequencyFromTarget(targetBaseHz, residualCents);
         const auto rawDetuneCents = juce::jmax(0.0f, baseDetuneCents + frame.detuneCents);
-        const auto detuneCents = SupersawLaw::pitchAwareDetune(rawDetuneCents, baseHz);
+        const auto detuneCents = SupersawLaw::pitchAwareDetune(rawDetuneCents, currentBaseHz);
 
         if ((sample & 7) == 0)
         {
@@ -311,8 +352,10 @@ void OmnariaVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int s
                 const auto drift = motion * history * 1.5f * std::sin((currentMidiNote + i * 7.0f) * 0.37f);
                 const auto ratio = std::pow(2.0f, (frequencyPosition * detuneCents + drift) / 1200.0f);
                 oscillatorA[i].setPulseWidth(pulseWidth); oscillatorB[i].setPulseWidth(pulseWidth);
-                oscillatorA[i].setFrequency(baseHz * pitchRatio * ratio); oscillatorB[i].setFrequency(baseHz * pitchRatio * bRatio * ratio);
+                oscillatorA[i].setFrequency(currentBaseHz * pitchRatio * ratio);
+                oscillatorB[i].setFrequency(currentBaseHz * pitchRatio * bRatio * ratio);
             }
+            subOscillator.setFrequency(currentBaseHz * std::pow(2.0f, static_cast<float>(subOctave)));
         }
 
         float left = 0.0f, right = 0.0f;
@@ -323,12 +366,42 @@ void OmnariaVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int s
             const auto stereoPosition = SupersawLaw::stereoPosition(i, unisonCount);
             const auto frequencyPosition = SupersawLaw::frequencyPosition(i, unisonCount);
             const auto ratio = std::pow(2.0f, frequencyPosition * detuneCents / 1200.0f);
-            const auto sourceHz = baseHz * ratio * juce::jmap(mix, 1.0f, bRatio);
+            const auto sourceHz = currentBaseHz * ratio * juce::jmap(mix, 1.0f, bRatio);
             const auto effectiveSpread = LayerArchitecture::frequencyDependentWidth(spread, sourceHz);
             const auto pan = juce::jlimit(-1.0f, 1.0f, stereoPosition * effectiveSpread);
             const auto voiceGain = SupersawLaw::voiceGain(i, unisonCount, detuneCents);
-            const auto source = juce::jmap(mix, oscillatorA[i].process(), oscillatorB[i].process()) * voiceGain;
-            left += source * std::sqrt(0.5f * (1.0f - pan)); right += source * std::sqrt(0.5f * (1.0f + pan));
+
+            const auto masterPhaseBefore = oscillatorA[i].getPhase();
+            const auto sourceA = oscillatorA[i].process();
+            if (syncAmount > 0.0001f && oscillatorA[i].getPhase() < masterPhaseBefore)
+                oscillatorB[i].nudgePhaseToward(0.0, syncAmount);
+            const auto sourceB = oscillatorB[i].process();
+            const auto source = juce::jmap(mix, sourceA, sourceB) * voiceGain;
+
+            left += source * std::sqrt(0.5f * (1.0f - pan));
+            right += source * std::sqrt(0.5f * (1.0f + pan));
+        }
+
+        // A8/A2: a pitch-tracked PM layer whose index is excited by the actual
+        // note-transition gesture. It adds upper identifying information without
+        // moving the CORE pitch centre. Alias-aware allocation retreats near Nyquist.
+        const auto gesture = juce::jmax(state.glideExcitation.load(), glideVelocity);
+        const auto pmModHz = currentBaseHz * 2.0f;
+        const auto requestedPm = pmAmount * (0.20f + 0.80f * gesture);
+        const auto safePm = LayerArchitecture::aliasAwareFmAmount(requestedPm, currentBaseHz, pmModHz,
+                                                                   static_cast<float>(currentSampleRate), 6.0f);
+        pmCarrierPhase += currentBaseHz / static_cast<float>(currentSampleRate);
+        pmModPhase += pmModHz / static_cast<float>(currentSampleRate);
+        pmCarrierPhase -= std::floor(pmCarrierPhase);
+        pmModPhase -= std::floor(pmModPhase);
+        if (safePm > 0.0001f)
+        {
+            const auto pmIndex = 2.2f * safePm;
+            const auto pm = std::sin(juce::MathConstants<float>::twoPi * pmCarrierPhase
+                                   + pmIndex * std::sin(juce::MathConstants<float>::twoPi * pmModPhase));
+            const auto pmGain = safePm * 0.22f;
+            left += pm * pmGain;
+            right += pm * pmGain;
         }
 
         const auto noise = (noiseRandom.nextFloat() * 2.0f - 1.0f) * noiseLevel * 0.30f;
@@ -342,8 +415,6 @@ void OmnariaVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int s
         }
         else
         {
-            // Keep resonator state advancing even when inaudible so automation into
-            // the layer does not reveal a frozen/discontinuous body.
             (void) resonator.process();
         }
 
@@ -392,15 +463,26 @@ void OmnariaVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int s
         left = filterA.processSample(0, left); right = filterA.processSample(1, right);
         if (filterMode == 1) { left = filterB.processSample(0, left); right = filterB.processSample(1, right); }
 
-        // A10: protected sub is generated from its own coherent oscillator and is
-        // recombined after drive, NASTY and filtering. It therefore cannot acquire
-        // stereo cancellation or nonlinear low-mid fog from specialist body layers.
+        // A13: formant identity is a separate resonant target rather than ordinary
+        // filter resonance. Coupling is the temporary default-off amount control.
+        if (formantAmount > 0.0001f)
+        {
+            const auto formantBase = 900.0f + 1900.0f * velocityTimbre;
+            const auto formantHz = LayerArchitecture::trackedFormantHz(formantBase, currentMidiNote, 0.18f);
+            formantL.setCutoffFrequency(formantHz); formantR.setCutoffFrequency(formantHz);
+            formantL.setResonance(0.24f); formantR.setResonance(0.24f);
+            const auto formantSampleL = formantL.processSample(0, left);
+            const auto formantSampleR = formantR.processSample(0, right);
+            const auto wet = 0.55f * formantAmount;
+            const auto dry = std::sqrt(juce::jmax(0.0f, 1.0f - wet * wet));
+            left = left * dry + formantSampleL * wet;
+            right = right * dry + formantSampleR * wet;
+        }
+
         const auto protectedSub = subOscillator.process() * subLevel * 0.55f * amp;
         left += protectedSub;
         right += protectedSub;
 
-        // A9: rhythm is independent from natural note articulation. Macro 4 is a
-        // temporary default-off activation path until dedicated UI parameters land.
         gatePhase += TempoGateLaw::phaseIncrement(state.bpm.load(), 0.25f, currentSampleRate);
         gatePhase -= std::floor(gatePhase);
         const auto rhythmicGate = TempoGateLaw::gate(gatePhase, 0.56f, 0.035f);
