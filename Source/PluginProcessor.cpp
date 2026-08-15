@@ -30,6 +30,13 @@ juce::AudioProcessorValueTreeState::ParameterLayout OmnariaAudioProcessor::creat
     layout.push_back(std::make_unique<juce::AudioParameterFloat>("cutoff", "Cutoff", cutoffRange, 7200.0f));
     layout.push_back(std::make_unique<juce::AudioParameterFloat>("resonance", "Resonance", juce::NormalisableRange<float>(0.2f, 12.0f, 0.001f, 0.5f), 0.72f));
     layout.push_back(std::make_unique<juce::AudioParameterFloat>("drive", "Drive", juce::NormalisableRange<float>(0.0f, 24.0f, 0.01f), 1.5f));
+    layout.push_back(std::make_unique<juce::AudioParameterFloat>("filter_env_amt", "Filter Env Amount", juce::NormalisableRange<float>(-6.0f, 6.0f, 0.01f), 0.0f));
+    layout.push_back(std::make_unique<juce::AudioParameterFloat>("velocity_timbre", "Velocity Timbre", juce::NormalisableRange<float>(0.0f, 1.0f), 0.35f));
+
+    layout.push_back(std::make_unique<juce::AudioParameterFloat>("filter_attack", "Filter Attack", juce::NormalisableRange<float>(0.001f, 10.0f, 0.0f, 0.25f), 0.003f));
+    layout.push_back(std::make_unique<juce::AudioParameterFloat>("filter_decay", "Filter Decay", juce::NormalisableRange<float>(0.001f, 10.0f, 0.0f, 0.25f), 0.28f));
+    layout.push_back(std::make_unique<juce::AudioParameterFloat>("filter_sustain", "Filter Sustain", juce::NormalisableRange<float>(0.0f, 1.0f), 0.10f));
+    layout.push_back(std::make_unique<juce::AudioParameterFloat>("filter_release", "Filter Release", juce::NormalisableRange<float>(0.005f, 20.0f, 0.0f, 0.25f), 0.32f));
 
     layout.push_back(std::make_unique<juce::AudioParameterFloat>("attack", "Attack", juce::NormalisableRange<float>(0.001f, 10.0f, 0.0f, 0.25f), 0.008f));
     layout.push_back(std::make_unique<juce::AudioParameterFloat>("decay", "Decay", juce::NormalisableRange<float>(0.001f, 10.0f, 0.0f, 0.25f), 0.45f));
@@ -152,8 +159,6 @@ void OmnariaAudioProcessor::randomiseDiscoverable()
                                     juce::jlimit(low, high, current(id) * ratio));
     };
 
-    // Preserve oscillator identity most of the time. Occasionally changing a
-    // source family gives DISCOVER useful distance without turning it into INIT randomise.
     if (random.nextFloat() < 0.22f)
         setParameterFromActualValue("oscA_shape", static_cast<float>(random.nextInt(3)));
     if (random.nextFloat() < 0.22f)
@@ -176,13 +181,17 @@ void OmnariaAudioProcessor::randomiseDiscoverable()
     mutateLinear("detune", 5.0f, 0.0f, 50.0f);
     mutateLinear("spread", 0.12f, 0.0f, 1.0f);
 
-    // Multiplicative mutation is much more musical for frequency/time values.
     mutateRatio("cutoff", 0.65f, 40.0f, 19000.0f);
     mutateRatio("resonance", 0.45f, 0.2f, 12.0f);
     mutateLinear("drive", 3.5f, 0.0f, 24.0f);
+    mutateLinear("filter_env_amt", 0.75f, -6.0f, 6.0f);
+    mutateLinear("velocity_timbre", 0.12f, 0.0f, 1.0f);
 
-    // DISCOVER now participates in the actual amplitude shape rather than
-    // leaving envelopes frozen while randomly changing tone around them.
+    mutateRatio("filter_attack", 0.60f, 0.001f, 10.0f);
+    mutateRatio("filter_decay", 0.60f, 0.001f, 10.0f);
+    mutateLinear("filter_sustain", 0.12f, 0.0f, 1.0f);
+    mutateRatio("filter_release", 0.55f, 0.005f, 20.0f);
+
     mutateRatio("attack", 0.65f, 0.001f, 10.0f);
     mutateRatio("decay", 0.55f, 0.001f, 10.0f);
     mutateLinear("sustain", 0.12f, 0.0f, 1.0f);
