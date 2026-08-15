@@ -1,4 +1,5 @@
 #include "OmnariaVoice.h"
+#include "SupersawLaw.h"
 #include <cmath>
 
 namespace omnaria
@@ -293,10 +294,9 @@ void OmnariaVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int s
             const auto pulseWidth = juce::jlimit(0.05f, 0.95f, basePulseWidth + frame.pulseWidthOffset);
             for (int i = 0; i < unisonCount; ++i)
             {
-                const auto linear = unisonCount == 1 ? 0.0f : (2.0f * i / static_cast<float>(unisonCount - 1) - 1.0f);
-                const auto pos = std::copysign(std::pow(std::abs(linear), 1.18f), linear);
+                const auto frequencyPosition = SupersawLaw::frequencyPosition(i, unisonCount);
                 const auto drift = motion * history * 1.5f * std::sin((currentMidiNote + i * 7.0f) * 0.37f);
-                const auto ratio = std::pow(2.0f, (pos * detuneCents + drift) / 1200.0f);
+                const auto ratio = std::pow(2.0f, (frequencyPosition * detuneCents + drift) / 1200.0f);
                 oscillatorA[i].setPulseWidth(pulseWidth); oscillatorB[i].setPulseWidth(pulseWidth);
                 oscillatorA[i].setFrequency(baseHz * pitchRatio * ratio); oscillatorB[i].setFrequency(baseHz * pitchRatio * bRatio * ratio);
             }
@@ -307,9 +307,8 @@ void OmnariaVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int s
         const auto spread = juce::jlimit(0.0f, 1.0f, smoothedSpread.getNextValue() + frame.spreadOffset);
         for (int i = 0; i < unisonCount; ++i)
         {
-            const auto linear = unisonCount == 1 ? 0.0f : (2.0f * i / static_cast<float>(unisonCount - 1) - 1.0f);
-            const auto pos = std::copysign(std::pow(std::abs(linear), 1.18f), linear);
-            const auto pan = juce::jlimit(-1.0f, 1.0f, pos * spread);
+            const auto stereoPosition = SupersawLaw::stereoPosition(i, unisonCount);
+            const auto pan = juce::jlimit(-1.0f, 1.0f, stereoPosition * spread);
             const auto source = juce::jmap(mix, oscillatorA[i].process(), oscillatorB[i].process()) * unisonNormalisation;
             left += source * std::sqrt(0.5f * (1.0f - pan)); right += source * std::sqrt(0.5f * (1.0f + pan));
         }
@@ -317,7 +316,6 @@ void OmnariaVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int s
         const auto noise = (noiseRandom.nextFloat() * 2.0f - 1.0f) * noiseLevel * 0.30f;
         left += centredSub + noise; right += centredSub + noise;
 
-        // Phase 4 SAMPLE is synthesis material, mixed before NASTY and filtering.
         auto randomTexture = stochasticState * 0.7f + brownState * 0.3f;
         const auto samplePair = sampleVoice.process(parameter("sample_tune") + frame.sampleTune, sampleMode,
                                                     juce::jlimit(-1.0f, 1.0f, parameter("sample_position") * 2.0f - 1.0f + frame.samplePosition),
