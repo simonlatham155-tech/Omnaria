@@ -11,7 +11,23 @@ For every preset compare:
 2. specialist-enhanced OMNARIA version
 3. strongest relevant external reference (Sylenth1 / Spire / Serum)
 
+External synths establish competitive quality and category expectations only. OMNARIA is free to sound different, cleaner, more expressive or more dimensional if it performs the musical job better.
+
 Level-match before judging. Reject an enhancement if it only sounds better because it is louder or wider.
+
+## Architecture-test rule
+
+Every preset equation is also an engine test.
+
+If the ideal equation cannot be expressed by the current synth architecture:
+1. flag the missing reusable capability,
+2. improve OMNARIA rather than weaken the preset,
+3. re-run every affected preset equation after the shared fix,
+4. document whether the new capability was accepted or deliberately rejected.
+
+The consolidated flags for presets 04–48 live in `PRESET_ARCHITECTURE_AUDIT_04_48.md`.
+
+By preset 48 the bank should therefore function as an architecture stress test: recurring missing capabilities should have become reusable engine features rather than hidden one-off preset compromises.
 
 ## Acoustic dimensions
 
@@ -26,17 +42,38 @@ Level-match before judging. Reject an enhancement if it only sounds better becau
 - dynamic non-repetition
 - nonlinear character
 - spatial depth
+- mix-cut efficiency
+- masking / redundancy
+- modulation-timescale separation
+- playback survival
 - CPU cost
 
 ## Engine roles
 
 CORE — stable musical identity, pitch, phase/unison, envelopes, filter.
-Brown — tight constrained stochastic movement; useful for bass/pluck/lead/rhythmic detail.
-Stochastic — broader organic non-repetition; useful for pads/strings/atmospheric evolution.
-NASTY — nonlinear/coupled threshold events and memorable record-defining moments; use sparingly.
+Brown — tight constrained stochastic movement; useful for micro-motion where correlated variation is an advantage.
+Stochastic — broader non-periodic evolution; useful for slower spectral/energy trajectories.
+NASTY — nonlinear/coupled threshold events and aggression; use where its nonlinear advantage is the point, not as generic thickness.
 SAMPLE — real/complex transients, texture and captured/resampled events that elementary oscillators cannot efficiently recreate.
+FM/PM — targeted sideband/formant/inharmonic information where it adds useful spectral identity more efficiently than stacking.
+TERRAIN — multidimensional evolving spectral behaviour where continuous trajectory through a nonlinear surface is advantageous.
 FILTER CHARACTER — harmonic redistribution/drive after the voice filter; Clean must remain a valid answer.
 FX — time/space/decorrelation; never use wetness to disguise a weak dry patch.
+
+## Layering rule — density without fog
+
+A multi-engine sound is not judged by how many engines are active. Each engine must contribute a distinct sonic advantage or manipulate another layer in a uniquely useful way.
+
+For layered engines penalise:
+- spectral masking
+- redundant correlated information
+- destructive phase interaction
+- unwanted nonlinear intermodulation
+- excessive true-peak/crest-factor cost
+- modulation processes occupying the same timescale
+- stereo width that weakens mono/body information
+
+Prefer complementary spectral and temporal territories. A cleaner OMNARIA result is allowed to differ strongly from the reference if the musical role improves.
 
 ## The 48 targets
 
@@ -118,27 +155,14 @@ Build these first because together they exercise different physics:
 
 ## Preset-specific idealisation rule
 
-Every finished preset must document an engine recipe. Example only:
-
-Progressive Supersaw:
-CORE 100%
-Brown 0–small if it improves microscopic motion
-Stochastic 0–small
-NASTY normally 0
-SAMPLE 0
-Filter Character by matched test
-FX only after dry sound passes
-
-Airy Evolving Pad:
-CORE establishes pitch/body
-Stochastic supplies broad organic evolution
-Brown only if tighter local detail is useful
-SAMPLE may supply air/texture
-NASTY only if a specific transition improves identity
-
-Clean Deep Sub:
-CORE dominates
-Brown/Stochastic/NASTY/SAMPLE default to zero unless blind listening proves an improvement
+Every finished preset must document:
+- musical job
+- acoustic-layer decomposition
+- engine advantage assigned to each layer
+- masking/clouding penalties considered
+- architecture flags exposed
+- reference qualities used as the competitive floor
+- final accepted/rejected specialist contributions
 
 ## Pass criteria
 
@@ -151,5 +175,7 @@ A preset passes only if:
 - it does not depend on accidental clipping
 - CPU use is proportionate to the audible gain
 - its identity survives removal of excessive reverb/delay
+- its useful identity survives mono/consumer/streaming conditions appropriate to the sound
+- no known architecture deficit was hidden by compromising the equation
 
 Phase 8 musical validation cannot be declared from CI alone. CI validates code/preset infrastructure; listening validates sound.
