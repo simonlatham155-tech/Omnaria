@@ -4,6 +4,7 @@
 #include "dsp/OmnariaStateEngine.h"
 #include "dsp/OmnariaVoice.h"
 #include "dsp/SamplePool.h"
+#include "dsp/ProductionFX.h"
 
 class OmnariaAudioProcessor final : public juce::AudioProcessor
 {
@@ -50,6 +51,7 @@ private:
     omnaria::OmnariaState engineState;
     omnaria::OmnariaStateEngine stateEngine;
     omnaria::SamplePool samplePool;
+    omnaria::ProductionFX productionFX;
     juce::Synthesiser synthesiser;
     juce::dsp::Gain<float> outputGain;
     juce::AudioFormatManager formatManager;
