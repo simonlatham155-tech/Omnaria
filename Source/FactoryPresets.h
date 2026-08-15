@@ -28,8 +28,8 @@ inline const std::array<FactoryPreset, 1>& factoryPresets()
             { "oscB_shape", 0 },
             { "osc_mix", 0.32f },
             { "oscB_coarse", 0 },
-            // Random/free phase avoids the static comb-like attack produced when
-            // every detuned saw repeatedly starts from the same phase relationship.
+            // Free/random initial phase prevents an identical comb-like attack
+            // relationship on every note while retaining a stable pitch centre.
             { "phase_mode", 1 },
             { "phase", 0.0f },
             { "unison", 7 },
@@ -37,6 +37,8 @@ inline const std::array<FactoryPreset, 1>& factoryPresets()
             { "spread", 0.86f },
             { "sub_level", 0.0f },
             { "noise_level", 0.0f },
+
+            // Reference-grade dry subtractive core.
             { "filter_mode", 1 },
             { "filter_character", 0 },
             { "filter_character_amount", 0.0f },
@@ -52,12 +54,20 @@ inline const std::array<FactoryPreset, 1>& factoryPresets()
             { "decay", 0.38f },
             { "sustain", 0.84f },
             { "release", 0.58f },
+
+            // Candidate B: Brown drives only the unison detune magnitude.
+            // In the current modulation law depth .035 gives about +/-0.63 cent
+            // movement at the detune destination: small enough to preserve pitch
+            // identity while decorrelating long-term beating of the side voices.
+            { "mod1_source", 16 },
+            { "mod1_dest", 5 },
+            { "mod1_depth", 0.035f },
+
+            // No broad stochastic motion or nonlinear engine yet. Those belong
+            // to candidate C only if the acoustic equation predicts an advantage.
             { "motion", 0.0f },
             { "nasty_amount", 0.0f },
             { "sample_level", 0.0f },
-            { "mod1_source", 0 },
-            { "mod1_dest", 0 },
-            { "mod1_depth", 0.0f },
             { "mod2_source", 0 },
             { "mod2_dest", 0 },
             { "mod2_depth", 0.0f },
@@ -67,6 +77,8 @@ inline const std::array<FactoryPreset, 1>& factoryPresets()
             { "mod4_source", 0 },
             { "mod4_dest", 0 },
             { "mod4_depth", 0.0f },
+
+            // Dry benchmark: FX cannot hide oscillator/filter weaknesses.
             { "fx_motion_mix", 0.0f },
             { "fx_delay_mix", 0.0f },
             { "fx_space_mix", 0.0f },
