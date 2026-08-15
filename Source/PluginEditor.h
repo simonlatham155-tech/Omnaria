@@ -47,14 +47,22 @@ private:
 
     ParamCombo oscAShape;
     ParamCombo oscBShape;
+    ParamCombo phaseMode;
     ParamKnob oscMix;
     ParamKnob oscBCoarse;
+    ParamKnob pulseWidth;
+    ParamKnob phase;
     ParamKnob unison;
     ParamKnob detune;
     ParamKnob spread;
+    ParamKnob subLevel;
+    ParamKnob subOctave;
+    ParamKnob noiseLevel;
 
+    ParamCombo filterMode;
     ParamKnob cutoff;
     ParamKnob resonance;
+    ParamKnob keytrack;
     ParamKnob drive;
     ParamKnob filterEnvAmount;
     ParamKnob velocityTimbre;
