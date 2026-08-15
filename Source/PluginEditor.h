@@ -4,6 +4,7 @@
 #include <array>
 #include "PluginProcessor.h"
 #include "DiscoverEngine.h"
+#include "InstructionEngine.h"
 #include "ui/WorldGlobe.h"
 
 class ParamKnob final : public juce::Component
@@ -29,7 +30,7 @@ private:
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> attachment;
 };
 
-class OmnariaAudioProcessorEditor final : public juce::AudioProcessorEditor
+class OmnariaAudioProcessorEditor final : public juce::AudioProcessorEditor, private juce::Timer
 {
 public:
     explicit OmnariaAudioProcessorEditor(OmnariaAudioProcessor&);
@@ -44,8 +45,15 @@ private:
     void persistDiscoverSettings();
     void refreshDiscoverUndo();
 
+    void timerCallback() override;
+    void cycleInstructionMode();
+    void setInstructionMode(InstructionEngine::Mode mode, bool persist);
+    void showInstruction(const InstructionEngine::Suggestion& suggestion);
+    void bindInstruction(ParamKnob& knob, const juce::String& parameterID);
+
     OmnariaAudioProcessor& processor;
     DiscoverEngine discoverEngine;
+    InstructionEngine instructionEngine;
     omnaria::WorldGlobe globe;
 
     ParamCombo oscAShape, oscBShape, phaseMode;
@@ -58,7 +66,6 @@ private:
     ParamCombo nastyModel;
     ParamKnob nastyAmount, nastyDeform, nastyFeedback, nastyCoupling, nastyEnergy, nastyDamping, nastyMoment;
 
-    // Phase 4 SAMPLE shares the specialist card with NASTY.
     ParamCombo sampleMode;
     ParamKnob sampleLevel, sampleTune, sampleStart, sampleEnd, samplePosition, sampleScan, sampleJitter;
     juce::ToggleButton sampleReverse { "REVERSE" };
@@ -82,7 +89,6 @@ private:
     juce::Label title;
     juce::Label subtitle;
 
-    // Phase 5 DISCOVER: compact header controls, no new permanent synthesis row.
     juce::TextButton discoverButton { "DISCOVER" };
     juce::TextButton undoDiscoverButton { "UNDO" };
     juce::Slider discoverWtf;
@@ -93,6 +99,14 @@ private:
     juce::TextButton lockNastyButton { "NASTY" };
     juce::TextButton lockSampleButton { "SAMPLE" };
     juce::TextButton lockModButton { "MOD" };
+
+    // Phase 6: only this tiny mode button is visible when Instruction Mode is OFF.
+    juce::TextButton instructionModeButton { "?" };
+    juce::Label instructionTitle;
+    juce::Label instructionText;
+    juce::TextButton instructionTryButton { "TRY IT" };
+    juce::TextButton instructionUndoButton { "UNDO TRY" };
+    InstructionEngine::Suggestion currentInstruction;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(OmnariaAudioProcessorEditor)
 };
