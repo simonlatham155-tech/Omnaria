@@ -39,7 +39,7 @@ public:
     void resized() override;
 
 private:
-    void showSpecialistPage(bool samplePage);
+    void showSpecialistPage(int page);
     void refreshSampleName();
     unsigned int getDiscoverLocks() const noexcept;
     void persistDiscoverSettings();
@@ -58,8 +58,8 @@ private:
 
     ParamCombo oscAShape, oscBShape, phaseMode;
     ParamKnob oscMix, oscBCoarse, pulseWidth, phase, unison, detune, spread, subLevel, subOctave, noiseLevel;
-    ParamCombo filterMode;
-    ParamKnob cutoff, resonance, keytrack, drive, filterEnvAmount, velocityTimbre;
+    ParamCombo filterMode, filterCharacter;
+    ParamKnob filterCharacterAmount, cutoff, resonance, keytrack, drive, filterEnvAmount, velocityTimbre;
     ParamKnob filterAttack, filterDecay, filterSustain, filterRelease, attack, decay, sustain, release;
     ParamKnob motion, history, focus, coupling, output;
 
@@ -75,9 +75,13 @@ private:
     juce::Label sampleNameLabel;
     std::unique_ptr<juce::FileChooser> sampleChooser;
 
+    // Phase 7 FX is the third page of the existing specialist card, not another permanent strip.
+    ParamCombo fxOrder, fxDelayDivision;
+    ParamKnob fxMotionMix, fxMotionRate, fxMotionDepth, fxDelayMix, fxDelayFeedback, fxSpaceMix, fxSpaceSize, fxSpaceDamping, fxWidth;
     juce::TextButton nastyTabButton { "NASTY" };
     juce::TextButton sampleTabButton { "SAMPLE" };
-    bool showingSamplePage { false };
+    juce::TextButton fxTabButton { "FX" };
+    int specialistPage { 0 }; // 0 NASTY, 1 SAMPLE, 2 FX
 
     std::array<std::unique_ptr<ParamKnob>, 4> lfoRates;
     std::array<std::unique_ptr<ParamCombo>, 4> lfoModes;
@@ -100,7 +104,6 @@ private:
     juce::TextButton lockSampleButton { "SAMPLE" };
     juce::TextButton lockModButton { "MOD" };
 
-    // Phase 6: only this tiny mode button is visible when Instruction Mode is OFF.
     juce::TextButton instructionModeButton { "?" };
     juce::Label instructionTitle;
     juce::Label instructionText;
