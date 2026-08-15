@@ -5,10 +5,10 @@
 OmnariaAudioProcessor::OmnariaAudioProcessor()
     : AudioProcessor(BusesProperties().withOutput("Output", juce::AudioChannelSet::stereo(), true)),
       parameters(*this, nullptr, "OMNARIA_STATE", createParameterLayout()),
-      worldEngine(worldState)
+      stateEngine(engineState)
 {
     for (int i = 0; i < 16; ++i)
-        synthesiser.addVoice(new omnaria::OmnariaVoice(parameters, worldState));
+        synthesiser.addVoice(new omnaria::OmnariaVoice(parameters, engineState));
 
     synthesiser.addSound(new omnaria::OmnariaSound());
     synthesiser.setNoteStealingEnabled(true);
@@ -36,10 +36,11 @@ juce::AudioProcessorValueTreeState::ParameterLayout OmnariaAudioProcessor::creat
     layout.push_back(std::make_unique<juce::AudioParameterFloat>("sustain", "Sustain", juce::NormalisableRange<float>(0.0f, 1.0f), 0.76f));
     layout.push_back(std::make_unique<juce::AudioParameterFloat>("release", "Release", juce::NormalisableRange<float>(0.005f, 20.0f, 0.0f, 0.25f), 0.75f));
 
-    layout.push_back(std::make_unique<juce::AudioParameterFloat>("evolution", "Evolution", juce::NormalisableRange<float>(0.0f, 1.0f), 0.0f));
-    layout.push_back(std::make_unique<juce::AudioParameterFloat>("memory", "Memory", juce::NormalisableRange<float>(0.0f, 1.0f), 0.35f));
-    layout.push_back(std::make_unique<juce::AudioParameterFloat>("gravity", "Gravity", juce::NormalisableRange<float>(0.0f, 1.0f), 0.78f));
-    layout.push_back(std::make_unique<juce::AudioParameterFloat>("interaction", "Interaction", juce::NormalisableRange<float>(0.0f, 1.0f), 0.0f));
+    // Experimental performance-state controls. These do not imply a new synthesis method.
+    layout.push_back(std::make_unique<juce::AudioParameterFloat>("motion", "Motion", juce::NormalisableRange<float>(0.0f, 1.0f), 0.0f));
+    layout.push_back(std::make_unique<juce::AudioParameterFloat>("history", "History", juce::NormalisableRange<float>(0.0f, 1.0f), 0.35f));
+    layout.push_back(std::make_unique<juce::AudioParameterFloat>("focus", "Focus", juce::NormalisableRange<float>(0.0f, 1.0f), 0.78f));
+    layout.push_back(std::make_unique<juce::AudioParameterFloat>("coupling", "Coupling", juce::NormalisableRange<float>(0.0f, 1.0f), 0.0f));
     layout.push_back(std::make_unique<juce::AudioParameterFloat>("output", "Output", juce::NormalisableRange<float>(-60.0f, 6.0f, 0.01f), -8.0f));
 
     return { layout.begin(), layout.end() };
@@ -47,7 +48,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout OmnariaAudioProcessor::creat
 
 void OmnariaAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
-    worldEngine.prepare(sampleRate);
+    stateEngine.prepare(sampleRate);
     synthesiser.setCurrentPlaybackSampleRate(sampleRate);
 
     for (int i = 0; i < synthesiser.getNumVoices(); ++i)
@@ -60,7 +61,7 @@ void OmnariaAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock
 
 void OmnariaAudioProcessor::releaseResources()
 {
-    worldEngine.reset();
+    stateEngine.reset();
     outputGain.reset();
 }
 
@@ -75,13 +76,13 @@ void OmnariaAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce:
     juce::ScopedNoDenormals noDenormals;
     buffer.clear();
 
-    worldEngine.processBlock(midi,
+    stateEngine.processBlock(midi,
                              getPlayHead(),
                              buffer.getNumSamples(),
-                             parameters.getRawParameterValue("evolution")->load(),
-                             parameters.getRawParameterValue("memory")->load(),
-                             parameters.getRawParameterValue("gravity")->load(),
-                             parameters.getRawParameterValue("interaction")->load());
+                             parameters.getRawParameterValue("motion")->load(),
+                             parameters.getRawParameterValue("history")->load(),
+                             parameters.getRawParameterValue("focus")->load(),
+                             parameters.getRawParameterValue("coupling")->load());
 
     synthesiser.renderNextBlock(buffer, midi, 0, buffer.getNumSamples());
 
@@ -139,10 +140,10 @@ void OmnariaAudioProcessor::randomiseDiscoverable()
     setParameterFromActualValue("resonance", uniform(0.45f, 3.5f));
     setParameterFromActualValue("drive", uniform(0.0f, 8.0f));
 
-    setParameterFromActualValue("evolution", uniform(0.08f, 0.78f));
-    setParameterFromActualValue("memory", uniform(0.15f, 0.82f));
-    setParameterFromActualValue("gravity", uniform(0.55f, 1.0f));
-    setParameterFromActualValue("interaction", uniform(0.0f, 0.35f));
+    setParameterFromActualValue("motion", uniform(0.05f, 0.70f));
+    setParameterFromActualValue("history", uniform(0.10f, 0.75f));
+    setParameterFromActualValue("focus", uniform(0.55f, 1.0f));
+    setParameterFromActualValue("coupling", uniform(0.0f, 0.25f));
 }
 
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
