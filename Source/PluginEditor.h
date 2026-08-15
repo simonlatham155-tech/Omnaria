@@ -10,10 +10,8 @@ class ParamKnob final : public juce::Component
 public:
     ParamKnob(juce::AudioProcessorValueTreeState& state, const juce::String& parameterID, const juce::String& displayName);
     void resized() override;
-
     juce::Slider slider;
     juce::Label label;
-
 private:
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> attachment;
 };
@@ -21,12 +19,9 @@ private:
 class ParamCombo final : public juce::Component
 {
 public:
-    ParamCombo(juce::AudioProcessorValueTreeState& state,
-               const juce::String& parameterID,
-               const juce::String& displayName,
-               const juce::StringArray& choices);
+    ParamCombo(juce::AudioProcessorValueTreeState& state, const juce::String& parameterID,
+               const juce::String& displayName, const juce::StringArray& choices);
     void resized() override;
-
 private:
     juce::Label label;
     juce::ComboBox combo;
@@ -38,7 +33,6 @@ class OmnariaAudioProcessorEditor final : public juce::AudioProcessorEditor
 public:
     explicit OmnariaAudioProcessorEditor(OmnariaAudioProcessor&);
     ~OmnariaAudioProcessorEditor() override = default;
-
     void paint(juce::Graphics&) override;
     void resized() override;
 
@@ -71,7 +65,6 @@ private:
     ParamKnob filterDecay;
     ParamKnob filterSustain;
     ParamKnob filterRelease;
-
     ParamKnob attack;
     ParamKnob decay;
     ParamKnob sustain;
@@ -82,6 +75,16 @@ private:
     ParamKnob focus;
     ParamKnob coupling;
     ParamKnob output;
+
+    // Compact Phase 3 surface: depth without another permanently expanded matrix.
+    ParamCombo nastyModel;
+    ParamKnob nastyAmount;
+    ParamKnob nastyDeform;
+    ParamKnob nastyFeedback;
+    ParamKnob nastyCoupling;
+    ParamKnob nastyEnergy;
+    ParamKnob nastyDamping;
+    ParamKnob nastyMoment;
 
     std::array<std::unique_ptr<ParamKnob>, 4> lfoRates;
     std::array<std::unique_ptr<ParamCombo>, 4> lfoModes;
