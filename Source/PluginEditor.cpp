@@ -81,6 +81,12 @@ OmnariaAudioProcessorEditor::OmnariaAudioProcessorEditor(OmnariaAudioProcessor& 
       cutoff(p.parameters, "cutoff", "Cutoff"),
       resonance(p.parameters, "resonance", "Resonance"),
       drive(p.parameters, "drive", "Drive"),
+      filterEnvAmount(p.parameters, "filter_env_amt", "Filt Env"),
+      velocityTimbre(p.parameters, "velocity_timbre", "Velocity"),
+      filterAttack(p.parameters, "filter_attack", "F Attack"),
+      filterDecay(p.parameters, "filter_decay", "F Decay"),
+      filterSustain(p.parameters, "filter_sustain", "F Sustain"),
+      filterRelease(p.parameters, "filter_release", "F Release"),
       attack(p.parameters, "attack", "Attack"),
       decay(p.parameters, "decay", "Decay"),
       sustain(p.parameters, "sustain", "Sustain"),
@@ -107,10 +113,12 @@ OmnariaAudioProcessorEditor::OmnariaAudioProcessorEditor(OmnariaAudioProcessor& 
     subtitle.setColour(juce::Label::textColourId, accent.withAlpha(0.92f));
     addAndMakeVisible(subtitle);
 
-    const std::array<juce::Component*, 20> components {
+    const std::array<juce::Component*, 26> components {
         &globe,
         &oscAShape, &oscBShape, &oscMix, &oscBCoarse, &unison, &detune, &spread,
-        &cutoff, &resonance, &drive, &attack, &decay, &sustain, &release,
+        &cutoff, &resonance, &drive, &filterEnvAmount, &velocityTimbre,
+        &filterAttack, &filterDecay, &filterSustain, &filterRelease,
+        &attack, &decay, &sustain, &release,
         &motion, &history, &focus, &coupling, &output
     };
 
@@ -134,7 +142,7 @@ void OmnariaAudioProcessorEditor::paint(juce::Graphics& g)
     body = body.reduced(14.0f, 8.0f);
 
     auto left = body.removeFromLeft(286.0f);
-    auto right = body.removeFromRight(310.0f);
+    auto right = body.removeFromRight(390.0f);
     auto centre = body.reduced(10.0f, 0.0f);
 
     for (const auto& panel : { left, centre, right, stateStrip })
@@ -149,7 +157,7 @@ void OmnariaAudioProcessorEditor::paint(juce::Graphics& g)
     g.setFont(juce::FontOptions(10.0f, juce::Font::bold));
     g.drawText("CORE ENGINE", left.withTrimmedLeft(14.0f).removeFromTop(24.0f), juce::Justification::centredLeft);
     g.drawText("ENGINE STATE", centre.withTrimmedLeft(14.0f).removeFromTop(24.0f), juce::Justification::centredLeft);
-    g.drawText("FILTER / AMP", right.withTrimmedLeft(14.0f).removeFromTop(24.0f), juce::Justification::centredLeft);
+    g.drawText("FILTER / EXPRESSION / AMP", right.withTrimmedLeft(14.0f).removeFromTop(24.0f), juce::Justification::centredLeft);
     g.drawText("PERFORMANCE", stateStrip.withTrimmedLeft(14.0f).removeFromTop(24.0f), juce::Justification::centredLeft);
 
     g.setColour(juce::Colours::white.withAlpha(0.72f));
@@ -172,7 +180,7 @@ void OmnariaAudioProcessorEditor::resized()
     body = body.reduced(14, 8);
 
     auto left = body.removeFromLeft(286).reduced(12);
-    auto right = body.removeFromRight(310).reduced(12);
+    auto right = body.removeFromRight(390).reduced(12);
     auto centre = body.reduced(10, 8);
 
     left.removeFromTop(24);
@@ -195,21 +203,29 @@ void OmnariaAudioProcessorEditor::resized()
     globe.setBounds(centre);
 
     right.removeFromTop(24);
-    auto filterRow = right.removeFromTop(right.getHeight() * 2 / 5);
-    const auto filterCell = filterRow.getWidth() / 3;
+    const auto rowHeight = juce::jmax(78, right.getHeight() / 3);
+
+    auto filterRow = right.removeFromTop(rowHeight);
+    const auto filterCell = filterRow.getWidth() / 5;
     cutoff.setBounds(filterRow.removeFromLeft(filterCell));
     resonance.setBounds(filterRow.removeFromLeft(filterCell));
+    filterEnvAmount.setBounds(filterRow.removeFromLeft(filterCell));
+    velocityTimbre.setBounds(filterRow.removeFromLeft(filterCell));
     drive.setBounds(filterRow);
 
-    auto envTop = right.removeFromTop(right.getHeight() / 2);
-    const auto envTopCell = envTop.getWidth() / 2;
-    attack.setBounds(envTop.removeFromLeft(envTopCell));
-    decay.setBounds(envTop);
+    auto filterEnvRow = right.removeFromTop(rowHeight);
+    const auto filterEnvCell = filterEnvRow.getWidth() / 4;
+    filterAttack.setBounds(filterEnvRow.removeFromLeft(filterEnvCell));
+    filterDecay.setBounds(filterEnvRow.removeFromLeft(filterEnvCell));
+    filterSustain.setBounds(filterEnvRow.removeFromLeft(filterEnvCell));
+    filterRelease.setBounds(filterEnvRow);
 
-    auto envBottom = right;
-    const auto envBottomCell = envBottom.getWidth() / 2;
-    sustain.setBounds(envBottom.removeFromLeft(envBottomCell));
-    release.setBounds(envBottom);
+    auto ampRow = right;
+    const auto ampCell = ampRow.getWidth() / 4;
+    attack.setBounds(ampRow.removeFromLeft(ampCell));
+    decay.setBounds(ampRow.removeFromLeft(ampCell));
+    sustain.setBounds(ampRow.removeFromLeft(ampCell));
+    release.setBounds(ampRow);
 
     stateStrip.removeFromTop(24);
     const auto stateCell = stateStrip.getWidth() / 5;
