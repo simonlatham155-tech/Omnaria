@@ -2,7 +2,7 @@ name: Build OMNARIA
 
 on:
   push:
-    branches: [ main, agent/latworld-foundation ]
+    branches: [ main, agent/omnaria-foundation ]
   pull_request:
     branches: [ main ]
 
