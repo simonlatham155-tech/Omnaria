@@ -14,12 +14,12 @@ ParamKnob::ParamKnob(juce::AudioProcessorValueTreeState& state,
 {
     label.setText(displayName.toUpperCase(), juce::dontSendNotification);
     label.setJustificationType(juce::Justification::centred);
-    label.setFont(juce::FontOptions(10.5f, juce::Font::bold));
+    label.setFont(juce::FontOptions(10.0f, juce::Font::bold));
     label.setColour(juce::Label::textColourId, juce::Colours::white.withAlpha(0.60f));
     addAndMakeVisible(label);
 
     slider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
-    slider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 76, 18);
+    slider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 72, 18);
     slider.setColour(juce::Slider::rotarySliderFillColourId, accent);
     slider.setColour(juce::Slider::rotarySliderOutlineColourId, juce::Colours::white.withAlpha(0.10f));
     slider.setColour(juce::Slider::thumbColourId, juce::Colours::white.withAlpha(0.90f));
@@ -44,7 +44,7 @@ ParamCombo::ParamCombo(juce::AudioProcessorValueTreeState& state,
 {
     label.setText(displayName.toUpperCase(), juce::dontSendNotification);
     label.setJustificationType(juce::Justification::centredLeft);
-    label.setFont(juce::FontOptions(10.5f, juce::Font::bold));
+    label.setFont(juce::FontOptions(10.0f, juce::Font::bold));
     label.setColour(juce::Label::textColourId, juce::Colours::white.withAlpha(0.58f));
     addAndMakeVisible(label);
 
@@ -73,13 +73,21 @@ OmnariaAudioProcessorEditor::OmnariaAudioProcessorEditor(OmnariaAudioProcessor& 
       globe(p.getEngineState()),
       oscAShape(p.parameters, "oscA_shape", "Osc A", { "Saw", "Pulse", "Sine" }),
       oscBShape(p.parameters, "oscB_shape", "Osc B", { "Saw", "Pulse", "Sine" }),
+      phaseMode(p.parameters, "phase_mode", "Phase Mode", { "Retrig", "Random" }),
       oscMix(p.parameters, "osc_mix", "Mix"),
       oscBCoarse(p.parameters, "oscB_coarse", "B Tune"),
+      pulseWidth(p.parameters, "pulse_width", "Pulse"),
+      phase(p.parameters, "phase", "Phase"),
       unison(p.parameters, "unison", "Unison"),
       detune(p.parameters, "detune", "Detune"),
       spread(p.parameters, "spread", "Spread"),
+      subLevel(p.parameters, "sub_level", "Sub"),
+      subOctave(p.parameters, "sub_octave", "Sub Oct"),
+      noiseLevel(p.parameters, "noise_level", "Noise"),
+      filterMode(p.parameters, "filter_mode", "Filter", { "LP12", "LP24", "HP12", "BP12" }),
       cutoff(p.parameters, "cutoff", "Cutoff"),
       resonance(p.parameters, "resonance", "Resonance"),
+      keytrack(p.parameters, "keytrack", "Keytrack"),
       drive(p.parameters, "drive", "Drive"),
       filterEnvAmount(p.parameters, "filter_env_amt", "Filt Env"),
       velocityTimbre(p.parameters, "velocity_timbre", "Velocity"),
@@ -99,7 +107,7 @@ OmnariaAudioProcessorEditor::OmnariaAudioProcessorEditor(OmnariaAudioProcessor& 
 {
     setSize(1280, 760);
     setResizable(true, false);
-    setResizeLimits(1040, 680, 1800, 1100);
+    setResizeLimits(1120, 680, 1800, 1100);
 
     title.setText("OMNARIA", juce::dontSendNotification);
     title.setJustificationType(juce::Justification::centred);
@@ -113,10 +121,11 @@ OmnariaAudioProcessorEditor::OmnariaAudioProcessorEditor(OmnariaAudioProcessor& 
     subtitle.setColour(juce::Label::textColourId, accent.withAlpha(0.92f));
     addAndMakeVisible(subtitle);
 
-    const std::array<juce::Component*, 26> components {
+    const std::array<juce::Component*, 34> components {
         &globe,
-        &oscAShape, &oscBShape, &oscMix, &oscBCoarse, &unison, &detune, &spread,
-        &cutoff, &resonance, &drive, &filterEnvAmount, &velocityTimbre,
+        &oscAShape, &oscBShape, &phaseMode, &oscMix, &oscBCoarse, &pulseWidth, &phase,
+        &unison, &detune, &spread, &subLevel, &subOctave, &noiseLevel,
+        &filterMode, &cutoff, &resonance, &keytrack, &drive, &filterEnvAmount, &velocityTimbre,
         &filterAttack, &filterDecay, &filterSustain, &filterRelease,
         &attack, &decay, &sustain, &release,
         &motion, &history, &focus, &coupling, &output
@@ -141,8 +150,8 @@ void OmnariaAudioProcessorEditor::paint(juce::Graphics& g)
     auto stateStrip = body.removeFromBottom(166.0f).reduced(14.0f, 10.0f);
     body = body.reduced(14.0f, 8.0f);
 
-    auto left = body.removeFromLeft(286.0f);
-    auto right = body.removeFromRight(390.0f);
+    auto left = body.removeFromLeft(350.0f);
+    auto right = body.removeFromRight(430.0f);
     auto centre = body.reduced(10.0f, 0.0f);
 
     for (const auto& panel : { left, centre, right, stateStrip })
@@ -155,7 +164,7 @@ void OmnariaAudioProcessorEditor::paint(juce::Graphics& g)
 
     g.setColour(juce::Colours::white.withAlpha(0.48f));
     g.setFont(juce::FontOptions(10.0f, juce::Font::bold));
-    g.drawText("CORE ENGINE", left.withTrimmedLeft(14.0f).removeFromTop(24.0f), juce::Justification::centredLeft);
+    g.drawText("CORE OSCILLATORS", left.withTrimmedLeft(14.0f).removeFromTop(24.0f), juce::Justification::centredLeft);
     g.drawText("ENGINE STATE", centre.withTrimmedLeft(14.0f).removeFromTop(24.0f), juce::Justification::centredLeft);
     g.drawText("FILTER / EXPRESSION / AMP", right.withTrimmedLeft(14.0f).removeFromTop(24.0f), juce::Justification::centredLeft);
     g.drawText("PERFORMANCE", stateStrip.withTrimmedLeft(14.0f).removeFromTop(24.0f), juce::Justification::centredLeft);
@@ -179,41 +188,54 @@ void OmnariaAudioProcessorEditor::resized()
     auto stateStrip = body.removeFromBottom(166).reduced(14, 10);
     body = body.reduced(14, 8);
 
-    auto left = body.removeFromLeft(286).reduced(12);
-    auto right = body.removeFromRight(390).reduced(12);
+    auto left = body.removeFromLeft(350).reduced(12);
+    auto right = body.removeFromRight(430).reduced(12);
     auto centre = body.reduced(10, 8);
 
     left.removeFromTop(24);
-    oscAShape.setBounds(left.removeFromTop(50));
-    oscBShape.setBounds(left.removeFromTop(50));
-    left.removeFromTop(6);
+    auto comboRow = left.removeFromTop(50);
+    const auto comboCell = comboRow.getWidth() / 3;
+    oscAShape.setBounds(comboRow.removeFromLeft(comboCell));
+    oscBShape.setBounds(comboRow.removeFromLeft(comboCell));
+    phaseMode.setBounds(comboRow);
 
-    auto leftRow1 = left.removeFromTop(left.getHeight() / 2);
-    const auto leftCellWidth = leftRow1.getWidth() / 3;
-    oscMix.setBounds(leftRow1.removeFromLeft(leftCellWidth));
-    oscBCoarse.setBounds(leftRow1.removeFromLeft(leftCellWidth));
-    unison.setBounds(leftRow1);
+    const auto oscRowHeight = juce::jmax(78, left.getHeight() / 3);
+    auto oscRow1 = left.removeFromTop(oscRowHeight);
+    auto oscCell1 = oscRow1.getWidth() / 4;
+    oscMix.setBounds(oscRow1.removeFromLeft(oscCell1));
+    oscBCoarse.setBounds(oscRow1.removeFromLeft(oscCell1));
+    pulseWidth.setBounds(oscRow1.removeFromLeft(oscCell1));
+    phase.setBounds(oscRow1);
 
-    auto leftRow2 = left;
-    const auto leftCellWidth2 = leftRow2.getWidth() / 2;
-    detune.setBounds(leftRow2.removeFromLeft(leftCellWidth2));
-    spread.setBounds(leftRow2);
+    auto oscRow2 = left.removeFromTop(oscRowHeight);
+    auto oscCell2 = oscRow2.getWidth() / 3;
+    unison.setBounds(oscRow2.removeFromLeft(oscCell2));
+    detune.setBounds(oscRow2.removeFromLeft(oscCell2));
+    spread.setBounds(oscRow2);
+
+    auto oscRow3 = left;
+    auto oscCell3 = oscRow3.getWidth() / 3;
+    subLevel.setBounds(oscRow3.removeFromLeft(oscCell3));
+    subOctave.setBounds(oscRow3.removeFromLeft(oscCell3));
+    noiseLevel.setBounds(oscRow3);
 
     centre.removeFromTop(18);
     globe.setBounds(centre);
 
     right.removeFromTop(24);
-    const auto rowHeight = juce::jmax(78, right.getHeight() / 3);
+    filterMode.setBounds(right.removeFromTop(50));
+    const auto rightRowHeight = juce::jmax(78, right.getHeight() / 3);
 
-    auto filterRow = right.removeFromTop(rowHeight);
-    const auto filterCell = filterRow.getWidth() / 5;
-    cutoff.setBounds(filterRow.removeFromLeft(filterCell));
-    resonance.setBounds(filterRow.removeFromLeft(filterCell));
-    filterEnvAmount.setBounds(filterRow.removeFromLeft(filterCell));
-    velocityTimbre.setBounds(filterRow.removeFromLeft(filterCell));
-    drive.setBounds(filterRow);
+    auto toneRow = right.removeFromTop(rightRowHeight);
+    const auto toneCell = toneRow.getWidth() / 6;
+    cutoff.setBounds(toneRow.removeFromLeft(toneCell));
+    resonance.setBounds(toneRow.removeFromLeft(toneCell));
+    keytrack.setBounds(toneRow.removeFromLeft(toneCell));
+    filterEnvAmount.setBounds(toneRow.removeFromLeft(toneCell));
+    velocityTimbre.setBounds(toneRow.removeFromLeft(toneCell));
+    drive.setBounds(toneRow);
 
-    auto filterEnvRow = right.removeFromTop(rowHeight);
+    auto filterEnvRow = right.removeFromTop(rightRowHeight);
     const auto filterEnvCell = filterEnvRow.getWidth() / 4;
     filterAttack.setBounds(filterEnvRow.removeFromLeft(filterEnvCell));
     filterDecay.setBounds(filterEnvRow.removeFromLeft(filterEnvCell));
