@@ -21,5 +21,14 @@ struct OmnariaState
     std::atomic<int> activeNotes { 0 };
     std::atomic<int> rootPitchClass { 0 };
     std::atomic<bool> hostPlaying { false };
+
+    // Gesture telemetry for mono/legato synthesis. These values describe the
+    // musical journey between note-ons; they do not themselves alter pitch.
+    std::atomic<int> previousNoteOn { 60 };
+    std::atomic<int> targetNoteOn { 60 };
+    std::atomic<float> glideIntervalCents { 0.0f };
+    std::atomic<float> glideDirection { 0.0f };    // -1 down, 0 none, +1 up
+    std::atomic<float> glideExcitation { 0.0f };   // 0..1 interval-derived gesture strength
+    std::atomic<unsigned int> noteOnSerial { 0 }; // increments for every note-on
 };
 } // namespace omnaria
