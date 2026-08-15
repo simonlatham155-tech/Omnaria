@@ -28,9 +28,9 @@ Acoustic consequence: OMNARIA must not assume seven voices alone makes a competi
 
 For a saw at fundamental f0, each detuned voice produces harmonic lines at n * fi. Summing several nearby fi creates time-varying interference. If offsets are regularly spaced, many oscillator pairs share similar difference frequencies, reinforcing an obvious common beat/flange rate. Irregular/nonlinear spacing distributes those difference frequencies and produces denser, less periodic motion.
 
-Published JP-8000 supersaw analysis identifies a centre saw plus six asymmetrically/non-uniformly detuned side saws. This is the important lesson, not the need to clone a JP-8000 exactly.
+Published JP-8000 supersaw analysis identifies a centre saw plus six asymmetrically/non-uniformly detuned side saws. Measured relative frequency offsets reported from that work are approximately -0.1100, -0.0629, -0.0195, 0, +0.0199, +0.0622, +0.1075 times the detune factor. The lesson is non-uniform beat distribution, not cloning the JP-8000.
 
-Random/free initial phase is being used for the first OMNARIA candidate because repeated identical phase starts can create a static comb-like attack. We will A/B this against retriggered phase during listening because transient consistency can sometimes be preferable in a lead.
+Random/free initial phase is used for the current OMNARIA candidate because repeated identical phase starts can create a static comb-like attack. We will A/B this against retriggered phase during listening because transient consistency can sometimes be preferable in a lead.
 
 ## Candidate A — clean CORE baseline
 
@@ -48,6 +48,33 @@ Random/free initial phase is being used for the first OMNARIA candidate because 
 
 This deliberately prevents specialist engines and FX from hiding weaknesses in CORE.
 
+## Candidate B — CORE plus sub-perceptual Brown decorrelation
+
+Candidate B preserves the same CORE identity but uses Brown motion only to vary the unison detune magnitude by a very small amount.
+
+Brown state:
+
+b[n] = clamp(rho * b[n-1] + sigma * xi[n], -1, 1)
+
+Current OMNARIA Brown source is bounded and heavily correlated in time. With modulation depth 0.035 at the Detune destination, the existing modulation law produces approximately +/-0.63 cent maximum variation around the 13.2-cent detune setting.
+
+The centre frequency itself is not pitch-modulated. Brown changes only the width of the detuned cloud, so the intended acoustic effect is:
+- reduce stationary/repeating beat relationships
+- increase long-term spectral density
+- preserve centre-pitch certainty
+- remain below the point where the listener hears obvious pitch wobble
+
+Candidate B is now the active factory-program implementation for preset 01.
+
+## Candidate C — conditional engine enrichment
+
+Candidate C is not encoded yet. It is allowed only if measurements show a remaining deficit after A/B. Possible tools:
+- tiny nonlinear/coupled contribution for harmonic density
+- broader stochastic evolution only in sustained upper-spectrum behaviour
+- no SAMPLE unless a specific transient/texture deficit is identified
+
+Candidate C must not be created merely because OMNARIA has more engines available.
+
 ## Measurements / listening checks
 
 1. Mono sum must not hollow out badly.
@@ -60,10 +87,12 @@ This deliberately prevents specialist engines and FX from hiding weaknesses in C
 8. Filter opening must remain smooth and energetic.
 9. Remove all FX when comparing oscillator/filter quality.
 10. CPU cost must remain proportionate to the audible gain.
+11. Candidate B must reduce beat periodicity without producing audible vibrato.
+12. Brown contribution must lose if it weakens pitch certainty or transient punch.
 
 ## CORE issue discovered by preset 01
 
-Current OMNARIA unison position uses a smooth symmetric spacing function. The next DSP experiment should compare this against a deliberately non-uniform 7-voice detune table inspired by measured supersaw behaviour. The winning method should be chosen by level-matched listening and mono/stereo analysis, not historical imitation.
+Current OMNARIA unison position uses a smooth symmetric spacing function. A later DSP experiment must compare this against a deliberately non-uniform 7-voice detune table based on measured supersaw behaviour. Pitch-detune distribution and stereo-pan distribution must remain separate calculations: a useful frequency-spacing law is not automatically the best stereo law.
 
 ## Acceptance gate
 
@@ -72,6 +101,7 @@ Preset 01 is not finished because values exist in code. It passes only after:
 - dry OMNARIA CORE is compared against strong Sylenth1 and Spire supersaw references
 - phase mode A/B is judged
 - current smooth detune distribution vs non-uniform distribution is judged
-- any specialist-engine addition must beat CORE-only rather than merely sound more complex
+- Candidate A vs Candidate B is judged level-matched
+- any Candidate C specialist-engine addition must beat the best A/B result rather than merely sound more complex
 
 Only then may preset 02 be added.
