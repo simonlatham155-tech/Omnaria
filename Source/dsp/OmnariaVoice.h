@@ -90,6 +90,8 @@ private:
 
     juce::dsp::StateVariableTPTFilter<float> filterA;
     juce::dsp::StateVariableTPTFilter<float> filterB;
+    juce::dsp::StateVariableTPTFilter<float> formantL;
+    juce::dsp::StateVariableTPTFilter<float> formantR;
     juce::ADSR ampEnvelope;
     juce::ADSR filterEnvelope;
     std::array<juce::ADSR, auxEnvelopeCount> auxEnvelopes;
@@ -119,6 +121,11 @@ private:
     int stochasticSamplesUntilTarget { 1 };
     float momentPhase { 0.0f };
     float gatePhase { 0.0f };
+    float glideElapsedSeconds { 0.0f };
+    float glideStartCents { 0.0f };
+    float pmCarrierPhase { 0.0f };
+    float pmModPhase { 0.0f };
+    unsigned int voiceNoteSerial { 0 };
     float previousDriveInputL { 0.0f };
     float previousDriveInputR { 0.0f };
 };
