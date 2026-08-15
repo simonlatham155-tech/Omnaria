@@ -1,5 +1,6 @@
 #include "PluginEditor.h"
 #include <array>
+#include <vector>
 
 namespace
 {
@@ -41,7 +42,8 @@ OmnariaAudioProcessorEditor::OmnariaAudioProcessorEditor(OmnariaAudioProcessor& 
     title.setText("OMNARIA", juce::dontSendNotification); title.setJustificationType(juce::Justification::centred); title.setFont(juce::FontOptions(30.0f, juce::Font::bold)); title.setColour(juce::Label::textColourId, juce::Colours::white.withAlpha(0.96f)); addAndMakeVisible(title);
     subtitle.setText("FLAGSHIP SYNTHESIZER", juce::dontSendNotification); subtitle.setJustificationType(juce::Justification::centred); subtitle.setFont(juce::FontOptions(10.0f, juce::Font::bold)); subtitle.setColour(juce::Label::textColourId, accent.withAlpha(0.92f)); addAndMakeVisible(subtitle);
 
-    for (juce::Component* c : { &globe, &oscAShape, &oscBShape, &phaseMode, &oscMix, &oscBCoarse, &pulseWidth, &phase, &unison, &detune, &spread, &subLevel, &subOctave, &noiseLevel, &filterMode, &filterCharacter, &filterCharacterAmount, &cutoff, &resonance, &keytrack, &drive, &filterEnvAmount, &velocityTimbre, &filterAttack, &filterDecay, &filterSustain, &filterRelease, &attack, &decay, &sustain, &release, &motion, &history, &focus, &coupling, &output, &nastyModel, &nastyAmount, &nastyDeform, &nastyFeedback, &nastyCoupling, &nastyEnergy, &nastyDamping, &nastyMoment, &sampleMode, &sampleLevel, &sampleTune, &sampleStart, &sampleEnd, &samplePosition, &sampleScan, &sampleJitter, &fxOrder, &fxDelayDivision, &fxMotionMix, &fxMotionRate, &fxMotionDepth, &fxDelayMix, &fxDelayFeedback, &fxSpaceMix, &fxSpaceSize, &fxSpaceDamping, &fxWidth }) addAndMakeVisible(*c);
+    const std::vector<juce::Component*> mainComponents { &globe, &oscAShape, &oscBShape, &phaseMode, &oscMix, &oscBCoarse, &pulseWidth, &phase, &unison, &detune, &spread, &subLevel, &subOctave, &noiseLevel, &filterMode, &filterCharacter, &filterCharacterAmount, &cutoff, &resonance, &keytrack, &drive, &filterEnvAmount, &velocityTimbre, &filterAttack, &filterDecay, &filterSustain, &filterRelease, &attack, &decay, &sustain, &release, &motion, &history, &focus, &coupling, &output, &nastyModel, &nastyAmount, &nastyDeform, &nastyFeedback, &nastyCoupling, &nastyEnergy, &nastyDamping, &nastyMoment, &sampleMode, &sampleLevel, &sampleTune, &sampleStart, &sampleEnd, &samplePosition, &sampleScan, &sampleJitter, &fxOrder, &fxDelayDivision, &fxMotionMix, &fxMotionRate, &fxMotionDepth, &fxDelayMix, &fxDelayFeedback, &fxSpaceMix, &fxSpaceSize, &fxSpaceDamping, &fxWidth };
+    for (auto* c : mainComponents) addAndMakeVisible(*c);
 
     sampleReverseAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(p.parameters, "sample_reverse", sampleReverse); sampleReverse.setColour(juce::ToggleButton::textColourId, juce::Colours::white.withAlpha(0.75f)); addAndMakeVisible(sampleReverse);
     sampleNameLabel.setJustificationType(juce::Justification::centredLeft); sampleNameLabel.setColour(juce::Label::textColourId, juce::Colours::white.withAlpha(0.58f)); sampleNameLabel.setFont(juce::FontOptions(10.0f, juce::Font::bold)); addAndMakeVisible(sampleNameLabel);
@@ -61,7 +63,16 @@ OmnariaAudioProcessorEditor::OmnariaAudioProcessorEditor(OmnariaAudioProcessor& 
     familiarLabel.setText("FAM", juce::dontSendNotification); wtfLabel.setText("WTF", juce::dontSendNotification); lockLabel.setText("LOCK", juce::dontSendNotification); for (auto* label : { &familiarLabel, &wtfLabel, &lockLabel }) { label->setFont(juce::FontOptions(8.0f, juce::Font::bold)); label->setColour(juce::Label::textColourId, juce::Colours::white.withAlpha(0.50f)); label->setJustificationType(juce::Justification::centred); addAndMakeVisible(*label); }
     auto setupLock = [&p, this](juce::TextButton& button, const char* property) { button.setClickingTogglesState(true); button.setToggleState(static_cast<bool>(p.parameters.state.getProperty(property, false)), juce::dontSendNotification); button.setColour(juce::TextButton::buttonColourId, juce::Colours::white.withAlpha(0.05f)); button.setColour(juce::TextButton::buttonOnColourId, accent.withAlpha(0.42f)); button.setColour(juce::TextButton::textColourOffId, juce::Colours::white.withAlpha(0.62f)); button.setColour(juce::TextButton::textColourOnId, juce::Colours::white.withAlpha(0.96f)); button.onClick = [this] { persistDiscoverSettings(); }; addAndMakeVisible(button); };
     setupLock(lockCoreButton, "discover_lock_core"); setupLock(lockNastyButton, "discover_lock_nasty"); setupLock(lockSampleButton, "discover_lock_sample"); setupLock(lockModButton, "discover_lock_mod");
-    discoverWtf.onValueChange = [this] { persistDiscoverSettings(); }; discoverButton.onClick = [this] { discoverEngine.discover(static_cast<float>(discoverWtf.getValue()), getDiscoverLocks(), processor.getSampleName() != "EMPTY"); refreshDiscoverUndo(); }; undoDiscoverButton.onClick = [this] { discoverEngine.undo(); refreshDiscoverUndo(); }; refreshDiscoverUndo();
+    discoverWtf.onValueChange = [this] { persistDiscoverSettings(); };
+    discoverButton.onClick = [this]
+    {
+        const auto wtf = static_cast<float>(discoverWtf.getValue());
+        const auto locks = getDiscoverLocks();
+        discoverEngine.discover(wtf, locks, processor.getSampleName() != "EMPTY");
+        Phase7Discover::evolve(processor.parameters, wtf, (locks & DiscoverEngine::lockCore) != 0u);
+        refreshDiscoverUndo();
+    };
+    undoDiscoverButton.onClick = [this] { discoverEngine.undo(); refreshDiscoverUndo(); }; refreshDiscoverUndo();
 
     instructionModeButton.setColour(juce::TextButton::buttonColourId, juce::Colours::white.withAlpha(0.06f)); instructionModeButton.setColour(juce::TextButton::textColourOffId, juce::Colours::white.withAlpha(0.72f)); instructionModeButton.onClick = [this] { cycleInstructionMode(); }; addAndMakeVisible(instructionModeButton);
     instructionTitle.setFont(juce::FontOptions(11.0f, juce::Font::bold)); instructionTitle.setColour(juce::Label::textColourId, accent.withAlpha(0.95f)); addAndMakeVisible(instructionTitle); instructionText.setFont(juce::FontOptions(11.0f)); instructionText.setColour(juce::Label::textColourId, juce::Colours::white.withAlpha(0.80f)); instructionText.setJustificationType(juce::Justification::centredLeft); addAndMakeVisible(instructionText);
