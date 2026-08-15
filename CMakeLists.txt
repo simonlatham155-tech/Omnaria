@@ -41,6 +41,7 @@ target_sources(Omnaria
         Source/Phase7Discover.h
         Source/InstructionEngine.h
         Source/dsp/BandlimitedOscillator.h
+        Source/dsp/SupersawLaw.h
         Source/dsp/NastyCell.h
         Source/dsp/SamplePool.h
         Source/dsp/ProductionFX.cpp
