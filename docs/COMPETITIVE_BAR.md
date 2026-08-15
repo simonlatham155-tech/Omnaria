@@ -1,6 +1,6 @@
 # OMNARIA Competitive Bar
 
-OMNARIA is the LATHAMAUDIO flagship. Feature count is not success. The release standard is that a producer can choose OMNARIA for ordinary dance-music work before LatWorld is even considered, and then LatWorld gives them musical behaviours the comparison instruments do not naturally provide.
+OMNARIA is the LATHAMAUDIO flagship. Feature count is not success. The release standard is that a producer can choose OMNARIA for ordinary dance-music work because its tone, workflow and CPU behaviour are genuinely competitive with the best current instruments.
 
 ## Instruments we must respect
 
@@ -14,7 +14,7 @@ OMNARIA is the LATHAMAUDIO flagship. Feature count is not success. The release s
 
 ## Gate A — CORE sound
 
-Evolution = 0 and Interaction = 0 must still produce release-ready sounds.
+Experimental performance-state controls set to neutral must still produce release-ready sounds.
 
 Required A/B categories:
 
@@ -60,7 +60,7 @@ Required before commercial release:
 
 ## Gate D — synthesis breadth
 
-LatWorld engines are introduced only when their quality is independently strong.
+Additional synthesis engines are introduced only when their quality is independently strong.
 
 Planned source/material families:
 
@@ -68,30 +68,30 @@ Planned source/material families:
 - wavetable
 - FM / phase modulation
 - wave-terrain
-- stochastic population
+- stochastic methods
 - spectral/additive
 - sample playback and multisample mapping
 - granular
 - physical/modal/resonator
-- sample analysis and ABSORB resynthesis
+- sample analysis and resynthesis
 
 The architecture must not require every engine to run simultaneously.
 
-## Gate E — LatWorld advantage
+## Gate E — original research
 
-This is the reason OMNARIA exists rather than becoming another hybrid synth.
+OMNARIA is allowed to become a research platform, but no new synthesis label is used merely because multiple existing techniques are combined.
 
-Required behaviours:
+A genuinely new engine would need:
 
-- beat/bar/phrase-aware synthesis
-- history-dependent Memory
-- harmonic Gravity that constrains complexity musically
-- evolving synthesis architecture without obvious patch crossfades
-- multiple timbres sharing one World
-- cooperative spectral/resource behaviour between timbres
-- dynamic compute allocation
-- centre globe displaying real World mechanics
-- sample traits becoming synthesis material through ABSORB
+- a formal mathematical/algorithmic mechanism
+- sonic behaviour not reducible to ordinary modulation, crossfading or effects
+- useful musician control
+- repeatable DAW-safe operation
+- practical real-time CPU performance
+- prior-art review against academic and commercial systems
+- an A/B test showing the defining behaviour disappears when the new mechanism is removed
+
+The preserved LatWorld hypothesis and its revival criteria are in `docs/research/LATWORLD_CONCEPT.md`.
 
 ## Gate F — performance
 
@@ -109,8 +109,8 @@ Track at minimum:
 - offline render speed
 - Intel Mac vs Apple Silicon
 
-The LatWorld control layer should be cheap enough to share globally; expensive audio-rate renderers should sleep when their timbre/source is inactive.
+Shared control-rate state should remain cheap; expensive audio-rate renderers should sleep when inactive where doing so is deterministic and safe.
 
 ## Current milestone
 
-0.1 proves the skeleton: quality-conscious CORE oscillation, playable polyphony, a shared Musical World, memory/energy/phrase state and a real-state globe. It is not a finished flagship and must not be evaluated as one yet.
+0.1 proves the skeleton: quality-conscious CORE oscillation, playable polyphony, shared host/performance state and a real-state globe. It is not a finished flagship and it is not a claim of a new synthesis method.
