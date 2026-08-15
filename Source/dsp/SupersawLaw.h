@@ -27,6 +27,16 @@ struct SupersawLaw
         0.39641641f, 0.34952845f, 0.30690303f
     };
 
+    // Candidate B3: broad stochastic evolution has a different job from Brown.
+    // Brown breathes detune width. Broad stochastic motion redistributes energy
+    // between outer and inner beat families. The shape is mirror-symmetric so the
+    // stereo image does not wander, and the centre stays at exactly zero modulation.
+    // The inner coefficient is chosen to make the first-order power change close to
+    // zero for the current centre-weighted law; exact correction is applied below.
+    static constexpr std::array<float, 7> stochasticEnergyShape {
+        1.0000f, 0.0f, -0.5990f, 0.0f, -0.5990f, 0.0f, 1.0000f
+    };
+
     static float frequencyPosition(int voiceIndex, int voiceCount) noexcept
     {
         if (voiceCount <= 1)
@@ -96,6 +106,41 @@ struct SupersawLaw
         constexpr float destinationCents = 18.0f;
         return destinationCents * juce::jlimit(-1.0f, 1.0f, brown)
                * juce::jlimit(0.0f, 1.0f, depth);
+    }
+
+    // Broad stochastic evolution changes which side-voice beat families dominate,
+    // rather than adding another pitch wobble. A modest default depth keeps the
+    // effect below obvious tremolo while making the long-term interference pattern
+    // less stationary.
+    static float stochasticEnergyMultiplier(int voiceIndex, int voiceCount,
+                                            float stochastic, float depth = 0.055f) noexcept
+    {
+        if (voiceCount != 7 || voiceIndex < 0 || voiceIndex >= 7)
+            return 1.0f;
+
+        stochastic = juce::jlimit(-1.0f, 1.0f, stochastic);
+        depth = juce::jlimit(0.0f, 0.20f, depth);
+        return juce::jmax(0.75f, 1.0f + depth * stochastic
+                                      * stochasticEnergyShape[static_cast<size_t>(voiceIndex)]);
+    }
+
+    // Exact power correction for B3. Because the centre-weight scale is common to
+    // all seven gains, this can be calculated from the normalized powerWeights.
+    // Thus broad stochastic movement changes density, not overall loudness.
+    static float stochasticPowerCorrection(float stochastic, float depth = 0.055f) noexcept
+    {
+        stochastic = juce::jlimit(-1.0f, 1.0f, stochastic);
+        depth = juce::jlimit(0.0f, 0.20f, depth);
+
+        float modulatedPower = 0.0f;
+        for (size_t i = 0; i < powerWeights.size(); ++i)
+        {
+            const auto multiplier = juce::jmax(0.75f, 1.0f + depth * stochastic * stochasticEnergyShape[i]);
+            const auto weighted = powerWeights[i] * multiplier;
+            modulatedPower += weighted * weighted;
+        }
+
+        return modulatedPower > 1.0e-8f ? 1.0f / std::sqrt(modulatedPower) : 1.0f;
     }
 
     static float repeatedBeatPenalty(float detuneCents) noexcept
