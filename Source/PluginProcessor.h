@@ -5,6 +5,7 @@
 #include "dsp/OmnariaVoice.h"
 #include "dsp/SamplePool.h"
 #include "dsp/ProductionFX.h"
+#include "FactoryPresets.h"
 
 class OmnariaAudioProcessor final : public juce::AudioProcessor
 {
@@ -26,10 +27,31 @@ public:
     bool isMidiEffect() const override { return false; }
     double getTailLengthSeconds() const override { return 20.0; }
 
-    int getNumPrograms() override;
+    int getNumPrograms() override { return static_cast<int>(omnaria::factoryPresets().size()); }
     int getCurrentProgram() override { return currentProgram; }
-    void setCurrentProgram(int index) override;
-    const juce::String getProgramName(int index) override;
+    void setCurrentProgram(int index) override
+    {
+        const auto& bank = omnaria::factoryPresets();
+        if (index < 0 || index >= static_cast<int>(bank.size())) return;
+
+        // Start every factory program from the actual parameter defaults. This prevents
+        // omitted values from leaking from the previously selected patch.
+        for (auto* p : getParameters())
+            if (auto* ranged = dynamic_cast<juce::RangedAudioParameter*>(p))
+                ranged->setValueNotifyingHost(ranged->getDefaultValue());
+
+        for (const auto& value : bank[static_cast<size_t>(index)].values)
+            if (auto* p = parameters.getParameter(value.id))
+                p->setValueNotifyingHost(p->convertTo0to1(value.value));
+
+        currentProgram = index;
+        parameters.state.setProperty("factory_program", currentProgram, nullptr);
+    }
+    const juce::String getProgramName(int index) override
+    {
+        const auto& bank = omnaria::factoryPresets();
+        return index >= 0 && index < static_cast<int>(bank.size()) ? bank[static_cast<size_t>(index)].name : juce::String();
+    }
     void changeProgramName(int, const juce::String&) override {}
 
     void getStateInformation(juce::MemoryBlock& destData) override;
@@ -47,8 +69,6 @@ private:
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
     void setParameterFromActualValue(const juce::String& id, float actualValue);
     void writeCaptureHistory(const juce::AudioBuffer<float>& buffer);
-    void applyFactoryPreset(int index);
-    void resetFactoryPresetParameters();
 
     omnaria::OmnariaState engineState;
     omnaria::OmnariaStateEngine stateEngine;
