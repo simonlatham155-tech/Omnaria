@@ -3,8 +3,8 @@
 
 namespace omnaria
 {
-WorldGlobe::WorldGlobe(const LatWorldState& worldState)
-    : state(worldState)
+WorldGlobe::WorldGlobe(const OmnariaState& engineState)
+    : state(engineState)
 {
     setOpaque(false);
     startTimerHz(30);
@@ -24,10 +24,10 @@ void WorldGlobe::paint(juce::Graphics& g)
     const auto accent = juce::Colour::fromRGB(150, 100, 255);
     const auto cyan = juce::Colour::fromRGB(70, 214, 255);
     const auto amber = juce::Colour::fromRGB(255, 174, 70);
-    const auto energy = state.worldEnergy.load();
-    const auto evolution = state.evolution.load();
-    const auto memory = state.memoryState.load();
-    const auto gravity = state.gravity.load();
+    const auto energy = state.performanceEnergy.load();
+    const auto motion = state.motion.load();
+    const auto history = state.historyState.load();
+    const auto focus = state.focus.load();
     const auto phrase = state.phrasePosition.load();
     const auto low = state.spectralLow.load();
     const auto mid = state.spectralMid.load();
@@ -52,8 +52,8 @@ void WorldGlobe::paint(juce::Graphics& g)
         auto ringBounds = juce::Rectangle<float>(centre.x - radius * squeeze,
                                                  centre.y + yOffset - radius * 0.13f,
                                                  radius * 2.0f * squeeze,
-                                                 radius * (0.24f + 0.08f * evolution));
-        g.setColour(cyan.withAlpha(0.055f + 0.045f * evolution));
+                                                 radius * (0.24f + 0.08f * motion));
+        g.setColour(cyan.withAlpha(0.055f + 0.045f * motion));
         g.drawEllipse(ringBounds, 1.0f);
     }
 
@@ -61,7 +61,7 @@ void WorldGlobe::paint(juce::Graphics& g)
     {
         const auto widthScale = 0.18f + 0.18f * static_cast<float>(meridian);
         auto meridianBounds = sphere.withSizeKeepingCentre(sphere.getWidth() * widthScale, sphere.getHeight());
-        g.setColour(accent.withAlpha(0.045f + 0.025f * gravity));
+        g.setColour(accent.withAlpha(0.045f + 0.025f * focus));
         g.drawEllipse(meridianBounds, 1.0f);
     }
 
@@ -73,26 +73,26 @@ void WorldGlobe::paint(juce::Graphics& g)
         auto latitude = std::asin(2.0f * fraction - 1.0f);
         auto longitude = static_cast<float>(i) * goldenAngle + animationPhase + phrase * juce::MathConstants<float>::twoPi;
 
-        const auto warp = evolution * (0.22f + memory * 0.28f)
+        const auto warp = motion * (0.22f + history * 0.28f)
                         * std::sin(longitude * (2.0f + 3.0f * high) + static_cast<float>(i) * 0.17f);
         latitude += warp * 0.32f;
         longitude += warp;
 
         const auto radialPulse = 0.78f + 0.13f * energy
-                               + 0.10f * evolution * std::sin(animationPhase * 1.7f + static_cast<float>(i));
+                               + 0.10f * motion * std::sin(animationPhase * 1.7f + static_cast<float>(i));
         const auto point = projectParticle(longitude, latitude, radius * radialPulse, centre);
 
         const auto bandPosition = static_cast<float>(i % 3);
         auto colour = bandPosition < 0.5f ? amber.interpolatedWith(accent, 1.0f - low)
                     : bandPosition < 1.5f ? accent.interpolatedWith(cyan, mid)
                                           : cyan.interpolatedWith(juce::Colours::white, high * 0.35f);
-        const auto dotSize = 1.7f + energy * 2.2f + ((i % 11) == 0 ? 1.5f * memory : 0.0f);
-        g.setColour(colour.withAlpha(0.30f + 0.52f * gravity));
+        const auto dotSize = 1.7f + energy * 2.2f + ((i % 11) == 0 ? 1.5f * history : 0.0f);
+        g.setColour(colour.withAlpha(0.30f + 0.52f * focus));
         g.fillEllipse(point.x - dotSize * 0.5f, point.y - dotSize * 0.5f, dotSize, dotSize);
     }
 
     const auto noteCount = static_cast<float>(state.activeNotes.load());
-    const auto coreRadius = 8.0f + 16.0f * gravity + juce::jmin(16.0f, noteCount * 2.4f);
+    const auto coreRadius = 8.0f + 16.0f * focus + juce::jmin(16.0f, noteCount * 2.4f);
     juce::ColourGradient coreGlow(juce::Colours::white.withAlpha(0.75f), centre.x, centre.y,
                                   accent.withAlpha(0.0f), centre.x + coreRadius * 2.2f, centre.y, true);
     g.setGradientFill(coreGlow);
@@ -108,7 +108,7 @@ void WorldGlobe::paint(juce::Graphics& g)
     g.setColour(juce::Colours::white.withAlpha(0.48f));
     const auto status = "PHRASE " + juce::String(static_cast<int>(phrase * 100.0f)).paddedLeft('0', 2)
                       + "%   ENERGY " + juce::String(static_cast<int>(energy * 100.0f)).paddedLeft('0', 2)
-                      + "%   MEMORY " + juce::String(static_cast<int>(memory * 100.0f)).paddedLeft('0', 2) + "%";
+                      + "%   HISTORY " + juce::String(static_cast<int>(history * 100.0f)).paddedLeft('0', 2) + "%";
     g.drawText(status, area.removeFromBottom(26.0f), juce::Justification::centred);
 }
 
@@ -116,7 +116,7 @@ void WorldGlobe::timerCallback()
 {
     const auto active = state.activeNotes.load() > 0;
     const auto playing = state.hostPlaying.load();
-    const auto energy = state.worldEnergy.load();
+    const auto energy = state.performanceEnergy.load();
     if (active || playing)
         animationPhase += 0.010f + 0.028f * energy;
 
