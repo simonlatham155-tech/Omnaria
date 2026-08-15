@@ -3,8 +3,8 @@
 
 namespace omnaria
 {
-OmnariaVoice::OmnariaVoice(juce::AudioProcessorValueTreeState& parameters, const LatWorldState& worldState)
-    : params(parameters), world(worldState)
+OmnariaVoice::OmnariaVoice(juce::AudioProcessorValueTreeState& parameters, const OmnariaState& sharedState)
+    : params(parameters), state(sharedState)
 {
     filter.setType(juce::dsp::StateVariableTPTFilterType::lowpass);
 }
@@ -87,20 +87,20 @@ void OmnariaVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int s
     envelopeParams.release = parameter("release");
     ampEnvelope.setParameters(envelopeParams);
 
-    const auto evolution = world.evolution.load();
-    const auto energy = world.worldEnergy.load();
-    const auto memory = world.memoryState.load();
-    const auto phrase = world.phrasePosition.load();
+    const auto motion = state.motion.load();
+    const auto energy = state.performanceEnergy.load();
+    const auto history = state.historyState.load();
+    const auto phrase = state.phrasePosition.load();
 
     const auto baseHz = static_cast<float>(juce::MidiMessage::getMidiNoteInHertz(currentMidiNote)) * pitchWheelRatio();
     const auto bRatio = std::pow(2.0f, coarseB / 12.0f);
 
     auto cutoff = parameter("cutoff");
-    if (evolution > 0.0f)
+    if (motion > 0.0f)
     {
         const auto phraseArc = 0.5f - 0.5f * std::cos(juce::MathConstants<float>::twoPi * phrase);
-        const auto worldOctaves = evolution * (0.55f * energy + 0.35f * phraseArc + 0.20f * memory);
-        cutoff *= std::pow(2.0f, worldOctaves);
+        const auto movementOctaves = motion * (0.55f * energy + 0.35f * phraseArc + 0.20f * history);
+        cutoff *= std::pow(2.0f, movementOctaves);
     }
     cutoff = juce::jlimit(20.0f, static_cast<float>(currentSampleRate * 0.45), cutoff);
     filter.setCutoffFrequency(cutoff);
@@ -112,8 +112,8 @@ void OmnariaVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int s
     for (int i = 0; i < unisonCount; ++i)
     {
         const auto position = unisonCount == 1 ? 0.0f : (2.0f * static_cast<float>(i) / static_cast<float>(unisonCount - 1) - 1.0f);
-        const auto worldDrift = evolution * memory * 1.5f * std::sin((static_cast<float>(currentMidiNote) + i * 7.0f) * 0.37f);
-        const auto cents = position * detuneCents + worldDrift;
+        const auto drift = motion * history * 1.5f * std::sin((static_cast<float>(currentMidiNote) + i * 7.0f) * 0.37f);
+        const auto cents = position * detuneCents + drift;
         const auto detuneRatio = std::pow(2.0f, cents / 1200.0f);
 
         auto& a = oscillatorA[static_cast<size_t>(i)];
