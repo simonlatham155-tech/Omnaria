@@ -59,7 +59,7 @@ ParamCombo::ParamCombo(juce::AudioProcessorValueTreeState& state, const juce::St
 void ParamCombo::resized() { auto a = getLocalBounds(); label.setBounds(a.removeFromTop(17)); combo.setBounds(a.reduced(0, 2)); }
 
 OmnariaAudioProcessorEditor::OmnariaAudioProcessorEditor(OmnariaAudioProcessor& p)
-    : AudioProcessorEditor(&p), processor(p), globe(p.getEngineState()),
+    : AudioProcessorEditor(&p), processor(p), discoverEngine(p.parameters), globe(p.getEngineState()),
       oscAShape(p.parameters, "oscA_shape", "Osc A", { "Saw", "Pulse", "Sine" }), oscBShape(p.parameters, "oscB_shape", "Osc B", { "Saw", "Pulse", "Sine" }),
       phaseMode(p.parameters, "phase_mode", "Phase Mode", { "Retrig", "Random" }), oscMix(p.parameters, "osc_mix", "Mix"), oscBCoarse(p.parameters, "oscB_coarse", "B Tune"),
       pulseWidth(p.parameters, "pulse_width", "Pulse"), phase(p.parameters, "phase", "Phase"), unison(p.parameters, "unison", "Unison"), detune(p.parameters, "detune", "Detune"),
@@ -117,8 +117,62 @@ OmnariaAudioProcessorEditor::OmnariaAudioProcessorEditor(OmnariaAudioProcessor& 
         modDepths[i] = std::make_unique<ParamKnob>(p.parameters, "mod" + s + "_depth", "Depth " + s);
         addAndMakeVisible(*lfoRates[i]); addAndMakeVisible(*lfoModes[i]); addAndMakeVisible(*macros[i]); addAndMakeVisible(*modSources[i]); addAndMakeVisible(*modDestinations[i]); addAndMakeVisible(*modDepths[i]);
     }
-    discoverButton.setColour(juce::TextButton::buttonColourId, accent.withAlpha(0.22f)); discoverButton.setColour(juce::TextButton::textColourOffId, juce::Colours::white.withAlpha(0.90f)); discoverButton.onClick = [this] { processor.randomiseDiscoverable(); }; addAndMakeVisible(discoverButton);
+
+    discoverButton.setColour(juce::TextButton::buttonColourId, accent.withAlpha(0.28f)); discoverButton.setColour(juce::TextButton::textColourOffId, juce::Colours::white.withAlpha(0.94f)); addAndMakeVisible(discoverButton);
+    undoDiscoverButton.setColour(juce::TextButton::buttonColourId, juce::Colours::white.withAlpha(0.07f)); undoDiscoverButton.setColour(juce::TextButton::textColourOffId, juce::Colours::white.withAlpha(0.72f)); addAndMakeVisible(undoDiscoverButton);
+
+    discoverWtf.setSliderStyle(juce::Slider::LinearHorizontal); discoverWtf.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0); discoverWtf.setRange(0.0, 1.0, 0.01);
+    discoverWtf.setColour(juce::Slider::trackColourId, accent.withAlpha(0.55f)); discoverWtf.setColour(juce::Slider::thumbColourId, juce::Colours::white.withAlpha(0.90f)); addAndMakeVisible(discoverWtf);
+    const auto savedWtf = static_cast<double>(p.parameters.state.getProperty("discover_wtf", 0.35)); discoverWtf.setValue(savedWtf, juce::dontSendNotification);
+
+    familiarLabel.setText("FAM", juce::dontSendNotification); wtfLabel.setText("WTF", juce::dontSendNotification); lockLabel.setText("LOCK", juce::dontSendNotification);
+    for (auto* label : std::array<juce::Label*, 3> { &familiarLabel, &wtfLabel, &lockLabel })
+    {
+        label->setFont(juce::FontOptions(8.0f, juce::Font::bold)); label->setColour(juce::Label::textColourId, juce::Colours::white.withAlpha(0.50f)); label->setJustificationType(juce::Justification::centred); addAndMakeVisible(*label);
+    }
+
+    auto setupLock = [&p, this] (juce::TextButton& button, const char* property)
+    {
+        button.setClickingTogglesState(true); button.setToggleState(static_cast<bool>(p.parameters.state.getProperty(property, false)), juce::dontSendNotification);
+        button.setColour(juce::TextButton::buttonColourId, juce::Colours::white.withAlpha(0.05f)); button.setColour(juce::TextButton::buttonOnColourId, accent.withAlpha(0.42f));
+        button.setColour(juce::TextButton::textColourOffId, juce::Colours::white.withAlpha(0.62f)); button.setColour(juce::TextButton::textColourOnId, juce::Colours::white.withAlpha(0.96f));
+        button.onClick = [this] { persistDiscoverSettings(); }; addAndMakeVisible(button);
+    };
+    setupLock(lockCoreButton, "discover_lock_core"); setupLock(lockNastyButton, "discover_lock_nasty"); setupLock(lockSampleButton, "discover_lock_sample"); setupLock(lockModButton, "discover_lock_mod");
+
+    discoverWtf.onValueChange = [this] { persistDiscoverSettings(); };
+    discoverButton.onClick = [this]
+    {
+        discoverEngine.discover(static_cast<float>(discoverWtf.getValue()), getDiscoverLocks(), processor.getSampleName() != "EMPTY");
+        refreshDiscoverUndo();
+    };
+    undoDiscoverButton.onClick = [this] { discoverEngine.undo(); refreshDiscoverUndo(); };
+    refreshDiscoverUndo();
     showSpecialistPage(false);
+}
+
+unsigned int OmnariaAudioProcessorEditor::getDiscoverLocks() const noexcept
+{
+    unsigned int locks = 0;
+    if (lockCoreButton.getToggleState()) locks |= DiscoverEngine::lockCore;
+    if (lockNastyButton.getToggleState()) locks |= DiscoverEngine::lockNasty;
+    if (lockSampleButton.getToggleState()) locks |= DiscoverEngine::lockSample;
+    if (lockModButton.getToggleState()) locks |= DiscoverEngine::lockMod;
+    return locks;
+}
+
+void OmnariaAudioProcessorEditor::persistDiscoverSettings()
+{
+    processor.parameters.state.setProperty("discover_wtf", discoverWtf.getValue(), nullptr);
+    processor.parameters.state.setProperty("discover_lock_core", lockCoreButton.getToggleState(), nullptr);
+    processor.parameters.state.setProperty("discover_lock_nasty", lockNastyButton.getToggleState(), nullptr);
+    processor.parameters.state.setProperty("discover_lock_sample", lockSampleButton.getToggleState(), nullptr);
+    processor.parameters.state.setProperty("discover_lock_mod", lockModButton.getToggleState(), nullptr);
+}
+
+void OmnariaAudioProcessorEditor::refreshDiscoverUndo()
+{
+    undoDiscoverButton.setEnabled(discoverEngine.canUndo());
 }
 
 void OmnariaAudioProcessorEditor::refreshSampleName() { sampleNameLabel.setText("SOURCE: " + processor.getSampleName(), juce::dontSendNotification); }
@@ -150,7 +204,7 @@ void OmnariaAudioProcessorEditor::paint(juce::Graphics& g)
 
 void OmnariaAudioProcessorEditor::resized()
 {
-    const auto bounds = getLocalBounds(); title.setBounds(bounds.getCentreX() - 150, 10, 300, 38); subtitle.setBounds(bounds.getCentreX() - 150, 45, 300, 18); discoverButton.setBounds(bounds.getRight() - 132, 20, 108, 34);
+    const auto bounds = getLocalBounds(); title.setBounds(bounds.getCentreX() - 150, 10, 300, 38); subtitle.setBounds(bounds.getCentreX() - 150, 45, 300, 18);
     auto body = bounds; body.removeFromTop(76); auto modulationStrip = body.removeFromBottom(246).reduced(14, 8); auto specialistStrip = body.removeFromBottom(124).reduced(14, 6); auto stateStrip = body.removeFromBottom(118).reduced(14, 6); body = body.reduced(14, 8);
     auto left = body.removeFromLeft(350).reduced(12), right = body.removeFromRight(430).reduced(12), centre = body.reduced(10, 8);
 
@@ -175,7 +229,14 @@ void OmnariaAudioProcessorEditor::resized()
         const auto cell = controls.getWidth() / 8; sampleMode.setBounds(controls.removeFromLeft(cell)); sampleLevel.setBounds(controls.removeFromLeft(cell)); sampleTune.setBounds(controls.removeFromLeft(cell)); sampleStart.setBounds(controls.removeFromLeft(cell)); sampleEnd.setBounds(controls.removeFromLeft(cell)); samplePosition.setBounds(controls.removeFromLeft(cell)); sampleScan.setBounds(controls.removeFromLeft(cell)); sampleJitter.setBounds(controls);
     }
 
-    modulationStrip.removeFromTop(24); auto sourceRow = modulationStrip.removeFromTop(82); const auto sourceC = sourceRow.getWidth() / 8; for (int i = 0; i < 4; ++i) lfoRates[i]->setBounds(sourceRow.removeFromLeft(sourceC)); for (int i = 0; i < 4; ++i) macros[i]->setBounds(sourceRow.removeFromLeft(sourceC));
+    auto discoverHeader = modulationStrip.removeFromTop(24);
+    auto controls = discoverHeader.removeFromRight(622).reduced(2, 0);
+    lockLabel.setBounds(controls.removeFromLeft(34));
+    for (auto* button : std::array<juce::TextButton*, 4> { &lockCoreButton, &lockNastyButton, &lockSampleButton, &lockModButton }) button->setBounds(controls.removeFromLeft(54).reduced(2, 1));
+    familiarLabel.setBounds(controls.removeFromLeft(28)); discoverWtf.setBounds(controls.removeFromLeft(128).reduced(2, 2)); wtfLabel.setBounds(controls.removeFromLeft(28));
+    undoDiscoverButton.setBounds(controls.removeFromLeft(62).reduced(2, 1)); discoverButton.setBounds(controls.reduced(2, 1));
+
+    auto sourceRow = modulationStrip.removeFromTop(82); const auto sourceC = sourceRow.getWidth() / 8; for (int i = 0; i < 4; ++i) lfoRates[i]->setBounds(sourceRow.removeFromLeft(sourceC)); for (int i = 0; i < 4; ++i) macros[i]->setBounds(sourceRow.removeFromLeft(sourceC));
     auto modeRow = modulationStrip.removeFromTop(44); const auto modeC = modeRow.getWidth() / 4; for (int i = 0; i < 4; ++i) lfoModes[i]->setBounds(modeRow.removeFromLeft(modeC).reduced(4, 0));
     auto routeRow = modulationStrip; const auto routeC = routeRow.getWidth() / 4; for (int i = 0; i < 4; ++i) { auto slot = routeRow.removeFromLeft(routeC).reduced(5, 0); auto depthArea = slot.removeFromRight(78); auto sourceArea = slot.removeFromTop(slot.getHeight() / 2); modSources[i]->setBounds(sourceArea); modDestinations[i]->setBounds(slot); modDepths[i]->setBounds(depthArea); }
 }
