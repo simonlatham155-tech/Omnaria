@@ -28,6 +28,21 @@ public:
 
     void setShape(Shape newShape) noexcept { shape = newShape; }
     void setPulseWidth(float newPulseWidth) noexcept { pulseWidth = juce::jlimit(0.05f, 0.95f, newPulseWidth); }
+    double getPhase() const noexcept { return phase; }
+
+    // Controlled hard-sync family: amount 0 leaves the slave untouched; amount 1
+    // places it exactly at target phase. Intermediate values shorten the current
+    // cycle without an abrupt all-or-nothing mode switch.
+    void nudgePhaseToward(double targetPhase, float amount01) noexcept
+    {
+        const auto a = juce::jlimit(0.0f, 1.0f, amount01);
+        auto target = targetPhase - std::floor(targetPhase);
+        auto delta = target - phase;
+        if (delta > 0.5) delta -= 1.0;
+        if (delta < -0.5) delta += 1.0;
+        phase += static_cast<double>(a) * delta;
+        phase -= std::floor(phase);
+    }
 
     float process() noexcept
     {
