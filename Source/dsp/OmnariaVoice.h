@@ -5,6 +5,7 @@
 #include "BandlimitedOscillator.h"
 #include "NastyCell.h"
 #include "OmnariaState.h"
+#include "SamplePool.h"
 
 namespace omnaria
 {
@@ -18,7 +19,7 @@ public:
 class OmnariaVoice final : public juce::SynthesiserVoice
 {
 public:
-    OmnariaVoice(juce::AudioProcessorValueTreeState& parameters, const OmnariaState& sharedState);
+    OmnariaVoice(juce::AudioProcessorValueTreeState& parameters, const OmnariaState& sharedState, const SamplePool& sharedSamples);
 
     bool canPlaySound(juce::SynthesiserSound* sound) override;
     void prepare(double sampleRate, int maximumBlockSize);
@@ -54,6 +55,11 @@ private:
         float nastyEnergy { 0.0f };
         float nastyDamping { 0.0f };
         float nastyMoment { 0.0f };
+        float sampleLevel { 0.0f };
+        float samplePosition { 0.0f };
+        float sampleScan { 0.0f };
+        float sampleJitter { 0.0f };
+        float sampleTune { 0.0f };
     };
 
     float parameter(const char* parameterID) const noexcept;
@@ -72,11 +78,13 @@ private:
 
     juce::AudioProcessorValueTreeState& params;
     const OmnariaState& state;
+    const SamplePool& samples;
 
     std::array<BandlimitedOscillator, maxUnison> oscillatorA;
     std::array<BandlimitedOscillator, maxUnison> oscillatorB;
     BandlimitedOscillator subOscillator;
     NastyCell nastyCell;
+    SampleVoice sampleVoice;
 
     juce::dsp::StateVariableTPTFilter<float> filterA;
     juce::dsp::StateVariableTPTFilter<float> filterB;
