@@ -36,7 +36,7 @@ void OmnariaVoice::prepare(double sampleRate, int maximumBlockSize)
     smoothedMix.reset(currentSampleRate, 0.012);
     smoothedSpread.reset(currentSampleRate, 0.012);
     smoothedCutoff.setCurrentAndTargetValue(7200.0f);
-    smoothedResonance.setCurrentAndTargetValue(0.72f);
+    smoothedResonance.setCurrentAndTargetValue(1.30f);
     smoothedDrive.setCurrentAndTargetValue(1.5f);
     smoothedMix.setCurrentAndTargetValue(0.28f);
     smoothedSpread.setCurrentAndTargetValue(0.82f);
@@ -53,12 +53,10 @@ void OmnariaVoice::startNote(int midiNoteNumber, float velocity, juce::Synthesis
 
     for (int i = 0; i < maxUnison; ++i)
     {
-        const auto phaseA = randomPhase
-            ? noiseRandom.nextDouble()
-            : std::fmod(static_cast<double>(requestedPhase) + 0.137 * static_cast<double>(i), 1.0);
-        const auto phaseB = randomPhase
-            ? noiseRandom.nextDouble()
-            : std::fmod(static_cast<double>(requestedPhase) + 0.370 + 0.193 * static_cast<double>(i), 1.0);
+        const auto phaseA = randomPhase ? noiseRandom.nextDouble()
+                                        : std::fmod(static_cast<double>(requestedPhase) + 0.137 * static_cast<double>(i), 1.0);
+        const auto phaseB = randomPhase ? noiseRandom.nextDouble()
+                                        : std::fmod(static_cast<double>(requestedPhase) + 0.370 + 0.193 * static_cast<double>(i), 1.0);
         oscillatorA[static_cast<size_t>(i)].reset(phaseA);
         oscillatorB[static_cast<size_t>(i)].reset(phaseB);
     }
@@ -66,6 +64,8 @@ void OmnariaVoice::startNote(int midiNoteNumber, float velocity, juce::Synthesis
     subOscillator.reset(randomPhase ? noiseRandom.nextDouble() : requestedPhase);
     filterA.reset();
     filterB.reset();
+    previousDriveInputL = 0.0f;
+    previousDriveInputR = 0.0f;
     ampEnvelope.noteOn();
     filterEnvelope.noteOn();
 }
@@ -85,14 +85,8 @@ void OmnariaVoice::stopNote(float, bool allowTailOff)
     }
 }
 
-void OmnariaVoice::pitchWheelMoved(int newPitchWheelValue)
-{
-    pitchWheel = newPitchWheelValue;
-}
-
-void OmnariaVoice::controllerMoved(int, int)
-{
-}
+void OmnariaVoice::pitchWheelMoved(int newPitchWheelValue) { pitchWheel = newPitchWheelValue; }
+void OmnariaVoice::controllerMoved(int, int) {}
 
 void OmnariaVoice::configureFilterTypes(int mode)
 {
@@ -102,6 +96,26 @@ void OmnariaVoice::configureFilterTypes(int mode)
     if (activeFilterMode == 3) type = juce::dsp::StateVariableTPTFilterType::bandpass;
     filterA.setType(type);
     filterB.setType(type);
+}
+
+float OmnariaVoice::antialiasedTanh(float x, float& previousX) noexcept
+{
+    const auto delta = x - previousX;
+    float result = 0.0f;
+
+    if (std::abs(delta) < 1.0e-4f)
+    {
+        result = std::tanh(0.5f * (x + previousX));
+    }
+    else
+    {
+        const auto primitiveNow = std::log(std::cosh(x));
+        const auto primitivePrevious = std::log(std::cosh(previousX));
+        result = (primitiveNow - primitivePrevious) / delta;
+    }
+
+    previousX = x;
+    return result;
 }
 
 void OmnariaVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int startSample, int numSamples)
@@ -120,18 +134,9 @@ void OmnariaVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int s
     const auto filterMode = juce::jlimit(0, 3, juce::roundToInt(parameter("filter_mode")));
     if (filterMode != activeFilterMode) configureFilterTypes(filterMode);
 
-    juce::ADSR::Parameters ampParams;
-    ampParams.attack = parameter("attack");
-    ampParams.decay = parameter("decay");
-    ampParams.sustain = parameter("sustain");
-    ampParams.release = parameter("release");
+    juce::ADSR::Parameters ampParams { parameter("attack"), parameter("decay"), parameter("sustain"), parameter("release") };
     ampEnvelope.setParameters(ampParams);
-
-    juce::ADSR::Parameters filterParams;
-    filterParams.attack = parameter("filter_attack");
-    filterParams.decay = parameter("filter_decay");
-    filterParams.sustain = parameter("filter_sustain");
-    filterParams.release = parameter("filter_release");
+    juce::ADSR::Parameters filterParams { parameter("filter_attack"), parameter("filter_decay"), parameter("filter_sustain"), parameter("filter_release") };
     filterEnvelope.setParameters(filterParams);
 
     const auto motion = state.motion.load();
@@ -141,8 +146,7 @@ void OmnariaVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int s
 
     const auto baseHz = static_cast<float>(juce::MidiMessage::getMidiNoteInHertz(currentMidiNote)) * pitchWheelRatio();
     const auto bRatio = std::pow(2.0f, coarseB / 12.0f);
-    const auto subRatio = std::pow(2.0f, static_cast<float>(subOctave));
-    subOscillator.setFrequency(baseHz * subRatio);
+    subOscillator.setFrequency(baseHz * std::pow(2.0f, static_cast<float>(subOctave)));
 
     auto baseCutoff = parameter("cutoff");
     const auto keytrack = juce::jlimit(0.0f, 1.0f, parameter("keytrack"));
@@ -150,12 +154,18 @@ void OmnariaVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int s
     if (motion > 0.0f)
     {
         const auto phraseArc = 0.5f - 0.5f * std::cos(juce::MathConstants<float>::twoPi * phrase);
-        const auto movementOctaves = motion * (0.55f * energy + 0.35f * phraseArc + 0.20f * history);
-        baseCutoff *= std::pow(2.0f, movementOctaves);
+        baseCutoff *= std::pow(2.0f, motion * (0.55f * energy + 0.35f * phraseArc + 0.20f * history));
     }
 
     smoothedCutoff.setTargetValue(juce::jlimit(20.0f, static_cast<float>(currentSampleRate * 0.45), baseCutoff));
-    smoothedResonance.setTargetValue(juce::jlimit(0.2f, 12.0f, parameter("resonance")));
+
+    // The public control remains 0.2..12 for current preset compatibility.
+    // Map it to the TPT damping parameter in the producer-expected direction:
+    // larger public value = narrower/more prominent resonance.
+    const auto publicResonance = juce::jlimit(0.2f, 12.0f, parameter("resonance"));
+    const auto resonance01 = (publicResonance - 0.2f) / 11.8f;
+    const auto tptDamping = juce::jmap(resonance01, 1.35f, 0.08f);
+    smoothedResonance.setTargetValue(tptDamping);
     smoothedDrive.setTargetValue(juce::jmax(0.0f, parameter("drive")));
     smoothedMix.setTargetValue(juce::jlimit(0.0f, 1.0f, parameter("osc_mix")));
     smoothedSpread.setTargetValue(juce::jlimit(0.0f, 1.0f, parameter("spread")));
@@ -170,10 +180,8 @@ void OmnariaVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int s
 
         auto& a = oscillatorA[static_cast<size_t>(i)];
         auto& b = oscillatorB[static_cast<size_t>(i)];
-        a.setShape(shapeA);
-        b.setShape(shapeB);
-        a.setPulseWidth(pulseWidth);
-        b.setPulseWidth(pulseWidth);
+        a.setShape(shapeA); b.setShape(shapeB);
+        a.setPulseWidth(pulseWidth); b.setPulseWidth(pulseWidth);
         a.setFrequency(baseHz * detuneRatio);
         b.setFrequency(baseHz * bRatio * detuneRatio);
     }
@@ -182,9 +190,6 @@ void OmnariaVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int s
     const auto velocityTimbre = juce::jlimit(0.0f, 1.0f, parameter("velocity_timbre"));
     const auto velocityScale = juce::jlimit(0.25f, 1.75f, 1.0f + velocityTimbre * (noteVelocity - 0.5f) * 1.4f);
     const auto numChannels = outputBuffer.getNumChannels();
-
-    // Correlated unison voices are normalised more strongly at low detune, then
-    // relaxed as detune increases. This protects centre weight and patch level.
     const auto decorrelation = juce::jlimit(0.0f, 1.0f, detuneCents / 35.0f);
     const auto exponent = juce::jmap(decorrelation, 0.88f, 0.58f);
     const auto unisonNormalisation = 0.90f / std::pow(static_cast<float>(unisonCount), exponent);
@@ -203,11 +208,9 @@ void OmnariaVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int s
             const auto pan = juce::jlimit(-1.0f, 1.0f, position * spread);
             const auto leftGain = std::sqrt(0.5f * (1.0f - pan));
             const auto rightGain = std::sqrt(0.5f * (1.0f + pan));
-            const auto a = oscillatorA[static_cast<size_t>(i)].process();
-            const auto b = oscillatorB[static_cast<size_t>(i)].process();
-            const auto voiceSample = juce::jmap(mix, a, b) * unisonNormalisation;
-            left += voiceSample * leftGain;
-            right += voiceSample * rightGain;
+            const auto source = juce::jmap(mix, oscillatorA[static_cast<size_t>(i)].process(), oscillatorB[static_cast<size_t>(i)].process()) * unisonNormalisation;
+            left += source * leftGain;
+            right += source * rightGain;
         }
 
         const auto centredSub = subOscillator.process() * subLevel * 0.55f;
@@ -217,8 +220,7 @@ void OmnariaVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int s
 
         const auto amp = ampEnvelope.getNextSample() * noteVelocity;
         const auto filterEnv = filterEnvelope.getNextSample();
-        left *= amp;
-        right *= amp;
+        left *= amp; right *= amp;
 
         const auto driveDb = smoothedDrive.getNextValue();
         if (driveDb > 0.01f)
@@ -226,19 +228,16 @@ void OmnariaVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int s
             const auto expressiveDrive = 1.0f + velocityTimbre * noteVelocity * 0.35f;
             const auto driveGain = juce::Decibels::decibelsToGain(driveDb) * expressiveDrive;
             const auto norm = 1.0f / juce::jmax(0.25f, std::tanh(driveGain));
-            left = std::tanh(left * driveGain) * norm;
-            right = std::tanh(right * driveGain) * norm;
+            left = antialiasedTanh(left * driveGain, previousDriveInputL) * norm;
+            right = antialiasedTanh(right * driveGain, previousDriveInputR) * norm;
         }
 
-        const auto envelopeOctaves = filterEnvAmount * filterEnv * velocityScale;
         const auto cutoff = juce::jlimit(20.0f,
                                          static_cast<float>(currentSampleRate * 0.45),
-                                         smoothedCutoff.getNextValue() * std::pow(2.0f, envelopeOctaves));
+                                         smoothedCutoff.getNextValue() * std::pow(2.0f, filterEnvAmount * filterEnv * velocityScale));
         const auto resonance = smoothedResonance.getNextValue();
-        filterA.setCutoffFrequency(cutoff);
-        filterA.setResonance(resonance);
-        filterB.setCutoffFrequency(cutoff);
-        filterB.setResonance(resonance);
+        filterA.setCutoffFrequency(cutoff); filterA.setResonance(resonance);
+        filterB.setCutoffFrequency(cutoff); filterB.setResonance(resonance);
 
         left = filterA.processSample(0, left);
         right = filterA.processSample(1, right);
