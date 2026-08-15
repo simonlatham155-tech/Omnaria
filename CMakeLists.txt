@@ -42,6 +42,8 @@ target_sources(Omnaria
         Source/InstructionEngine.h
         Source/dsp/BandlimitedOscillator.h
         Source/dsp/SupersawLaw.h
+        Source/dsp/GlideLaw.h
+        Source/dsp/LayerArchitecture.h
         Source/dsp/NastyCell.h
         Source/dsp/SamplePool.h
         Source/dsp/ProductionFX.cpp
