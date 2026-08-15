@@ -45,18 +45,21 @@ inline const std::array<FactoryPreset, 1>& factoryPresets()
             { "filter_release", 0.34f }, { "attack", 0.005f },
             { "decay", 0.38f }, { "sustain", 0.84f }, { "release", 0.58f },
 
-            // OMNARIA Candidate B equation:
-            // d_eff(t) = d0 + 18 * 0.035 * B(t) cents.
-            // Therefore |delta d| <= 0.63 cent because |B| <= 1.
-            // Brown changes cloud width, not global pitch. The centre voice has
-            // zero detune position, so its frequency remains f0. This targets
-            // long-term beat decorrelation without audible vibrato.
+            // Candidate B2/B3 stochastic split.
+            // Brown: d_eff(t) = d0 + 18 * 0.035 * B(t) cents, so |delta d| <= 0.63 cent.
+            // It breathes cloud width only; the centre detune position is zero.
             { "mod1_source", 16 }, { "mod1_dest", 5 }, { "mod1_depth", 0.035f },
 
-            // Candidate C is intentionally absent. We first establish whether
-            // bounded Brown decorrelation improves the conventional reference.
+            // Broad stochastic is deliberately assigned a different physical job.
+            // It slowly cross-distributes energy between the two independently phased
+            // same-pitch saw populations. This changes interference/spectral density
+            // without modulating the fundamental. Depth is intentionally sub-perceptual;
+            // the dedicated side-voice stochastic-energy law remains available for a
+            // later A/B if this simpler architecture does not earn its place.
+            { "mod2_source", 17 }, { "mod2_dest", 4 }, { "mod2_depth", 0.045f },
+
+            // NASTY and SAMPLE remain absent until a measured deficit gives them a job.
             { "motion", 0.0f }, { "nasty_amount", 0.0f }, { "sample_level", 0.0f },
-            { "mod2_source", 0 }, { "mod2_dest", 0 }, { "mod2_depth", 0.0f },
             { "mod3_source", 0 }, { "mod3_dest", 0 }, { "mod3_depth", 0.0f },
             { "mod4_source", 0 }, { "mod4_dest", 0 }, { "mod4_depth", 0.0f },
 
