@@ -44,6 +44,8 @@ target_sources(Omnaria
         Source/dsp/SupersawLaw.h
         Source/dsp/GlideLaw.h
         Source/dsp/LayerArchitecture.h
+        Source/dsp/ExcitationResonator.h
+        Source/dsp/TempoGateLaw.h
         Source/dsp/NastyCell.h
         Source/dsp/SamplePool.h
         Source/dsp/ProductionFX.cpp
