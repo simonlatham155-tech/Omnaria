@@ -43,6 +43,7 @@ private:
 
     juce::dsp::StateVariableTPTFilter<float> filter;
     juce::ADSR ampEnvelope;
+    juce::ADSR filterEnvelope;
 
     double currentSampleRate { 44100.0 };
     int currentMidiNote { 60 };
