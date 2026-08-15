@@ -6,6 +6,7 @@
 #include "NastyCell.h"
 #include "OmnariaState.h"
 #include "SamplePool.h"
+#include "ExcitationResonator.h"
 
 namespace omnaria
 {
@@ -85,6 +86,7 @@ private:
     BandlimitedOscillator subOscillator;
     NastyCell nastyCell;
     SampleVoice sampleVoice;
+    ExcitationResonator resonator;
 
     juce::dsp::StateVariableTPTFilter<float> filterA;
     juce::dsp::StateVariableTPTFilter<float> filterB;
@@ -116,6 +118,7 @@ private:
     float stochasticTarget { 0.0f };
     int stochasticSamplesUntilTarget { 1 };
     float momentPhase { 0.0f };
+    float gatePhase { 0.0f };
     float previousDriveInputL { 0.0f };
     float previousDriveInputR { 0.0f };
 };
