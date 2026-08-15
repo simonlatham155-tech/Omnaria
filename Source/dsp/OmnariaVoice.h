@@ -34,20 +34,31 @@ private:
     float parameter(const char* parameterID) const noexcept;
     BandlimitedOscillator::Shape shapeForIndex(int index) const noexcept;
     float pitchWheelRatio() const noexcept;
+    void configureFilterTypes(int mode);
 
     juce::AudioProcessorValueTreeState& params;
     const OmnariaState& state;
 
     std::array<BandlimitedOscillator, maxUnison> oscillatorA;
     std::array<BandlimitedOscillator, maxUnison> oscillatorB;
+    BandlimitedOscillator subOscillator;
 
-    juce::dsp::StateVariableTPTFilter<float> filter;
+    juce::dsp::StateVariableTPTFilter<float> filterA;
+    juce::dsp::StateVariableTPTFilter<float> filterB;
     juce::ADSR ampEnvelope;
     juce::ADSR filterEnvelope;
 
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Multiplicative> smoothedCutoff;
+    juce::SmoothedValue<float> smoothedResonance;
+    juce::SmoothedValue<float> smoothedDrive;
+    juce::SmoothedValue<float> smoothedMix;
+    juce::SmoothedValue<float> smoothedSpread;
+
+    juce::Random noiseRandom { 0x4f4d4e49 };
     double currentSampleRate { 44100.0 };
     int currentMidiNote { 60 };
     int pitchWheel { 8192 };
+    int activeFilterMode { -1 };
     float noteVelocity { 0.0f };
 };
 } // namespace omnaria
