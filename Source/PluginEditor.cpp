@@ -70,7 +70,7 @@ void ParamCombo::resized()
 OmnariaAudioProcessorEditor::OmnariaAudioProcessorEditor(OmnariaAudioProcessor& p)
     : AudioProcessorEditor(&p),
       processor(p),
-      globe(p.getWorldState()),
+      globe(p.getEngineState()),
       oscAShape(p.parameters, "oscA_shape", "Osc A", { "Saw", "Pulse", "Sine" }),
       oscBShape(p.parameters, "oscB_shape", "Osc B", { "Saw", "Pulse", "Sine" }),
       oscMix(p.parameters, "osc_mix", "Mix"),
@@ -85,10 +85,10 @@ OmnariaAudioProcessorEditor::OmnariaAudioProcessorEditor(OmnariaAudioProcessor& 
       decay(p.parameters, "decay", "Decay"),
       sustain(p.parameters, "sustain", "Sustain"),
       release(p.parameters, "release", "Release"),
-      evolution(p.parameters, "evolution", "Evolution"),
-      memory(p.parameters, "memory", "Memory"),
-      gravity(p.parameters, "gravity", "Gravity"),
-      interaction(p.parameters, "interaction", "Interaction"),
+      motion(p.parameters, "motion", "Motion"),
+      history(p.parameters, "history", "History"),
+      focus(p.parameters, "focus", "Focus"),
+      coupling(p.parameters, "coupling", "Coupling"),
       output(p.parameters, "output", "Output")
 {
     setSize(1280, 760);
@@ -101,7 +101,7 @@ OmnariaAudioProcessorEditor::OmnariaAudioProcessorEditor(OmnariaAudioProcessor& 
     title.setColour(juce::Label::textColourId, juce::Colours::white.withAlpha(0.96f));
     addAndMakeVisible(title);
 
-    subtitle.setText("LATWORLD SYNTHESIS", juce::dontSendNotification);
+    subtitle.setText("FLAGSHIP SYNTHESIZER", juce::dontSendNotification);
     subtitle.setJustificationType(juce::Justification::centred);
     subtitle.setFont(juce::FontOptions(10.0f, juce::Font::bold));
     subtitle.setColour(juce::Label::textColourId, accent.withAlpha(0.92f));
@@ -111,7 +111,7 @@ OmnariaAudioProcessorEditor::OmnariaAudioProcessorEditor(OmnariaAudioProcessor& 
         &globe,
         &oscAShape, &oscBShape, &oscMix, &oscBCoarse, &unison, &detune, &spread,
         &cutoff, &resonance, &drive, &attack, &decay, &sustain, &release,
-        &evolution, &memory, &gravity, &interaction, &output
+        &motion, &history, &focus, &coupling, &output
     };
 
     for (auto* component : components)
@@ -130,14 +130,14 @@ void OmnariaAudioProcessorEditor::paint(juce::Graphics& g)
 
     auto body = getLocalBounds().toFloat();
     body.removeFromTop(76.0f);
-    auto worldStrip = body.removeFromBottom(166.0f).reduced(14.0f, 10.0f);
+    auto stateStrip = body.removeFromBottom(166.0f).reduced(14.0f, 10.0f);
     body = body.reduced(14.0f, 8.0f);
 
     auto left = body.removeFromLeft(286.0f);
     auto right = body.removeFromRight(310.0f);
     auto centre = body.reduced(10.0f, 0.0f);
 
-    for (const auto& panel : { left, centre, right, worldStrip })
+    for (const auto& panel : { left, centre, right, stateStrip })
     {
         g.setColour(panelColour);
         g.fillRoundedRectangle(panel, 15.0f);
@@ -148,9 +148,9 @@ void OmnariaAudioProcessorEditor::paint(juce::Graphics& g)
     g.setColour(juce::Colours::white.withAlpha(0.48f));
     g.setFont(juce::FontOptions(10.0f, juce::Font::bold));
     g.drawText("CORE ENGINE", left.withTrimmedLeft(14.0f).removeFromTop(24.0f), juce::Justification::centredLeft);
-    g.drawText("WORLD MECHANICS", centre.withTrimmedLeft(14.0f).removeFromTop(24.0f), juce::Justification::centredLeft);
+    g.drawText("ENGINE STATE", centre.withTrimmedLeft(14.0f).removeFromTop(24.0f), juce::Justification::centredLeft);
     g.drawText("FILTER / AMP", right.withTrimmedLeft(14.0f).removeFromTop(24.0f), juce::Justification::centredLeft);
-    g.drawText("LATWORLD", worldStrip.withTrimmedLeft(14.0f).removeFromTop(24.0f), juce::Justification::centredLeft);
+    g.drawText("PERFORMANCE", stateStrip.withTrimmedLeft(14.0f).removeFromTop(24.0f), juce::Justification::centredLeft);
 
     g.setColour(juce::Colours::white.withAlpha(0.72f));
     g.setFont(juce::FontOptions(15.0f));
@@ -168,7 +168,7 @@ void OmnariaAudioProcessorEditor::resized()
 
     auto body = bounds;
     body.removeFromTop(76);
-    auto worldStrip = body.removeFromBottom(166).reduced(14, 10);
+    auto stateStrip = body.removeFromBottom(166).reduced(14, 10);
     body = body.reduced(14, 8);
 
     auto left = body.removeFromLeft(286).reduced(12);
@@ -211,11 +211,11 @@ void OmnariaAudioProcessorEditor::resized()
     sustain.setBounds(envBottom.removeFromLeft(envBottomCell));
     release.setBounds(envBottom);
 
-    worldStrip.removeFromTop(24);
-    const auto worldCell = worldStrip.getWidth() / 5;
-    evolution.setBounds(worldStrip.removeFromLeft(worldCell));
-    memory.setBounds(worldStrip.removeFromLeft(worldCell));
-    gravity.setBounds(worldStrip.removeFromLeft(worldCell));
-    interaction.setBounds(worldStrip.removeFromLeft(worldCell));
-    output.setBounds(worldStrip);
+    stateStrip.removeFromTop(24);
+    const auto stateCell = stateStrip.getWidth() / 5;
+    motion.setBounds(stateStrip.removeFromLeft(stateCell));
+    history.setBounds(stateStrip.removeFromLeft(stateCell));
+    focus.setBounds(stateStrip.removeFromLeft(stateCell));
+    coupling.setBounds(stateStrip.removeFromLeft(stateCell));
+    output.setBounds(stateStrip);
 }
