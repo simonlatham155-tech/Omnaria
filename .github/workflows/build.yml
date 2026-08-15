@@ -27,11 +27,46 @@ jobs:
           -DCMAKE_OSX_DEPLOYMENT_TARGET=10.15
 
       - name: Build Release
-        run: cmake --build build --config Release --target Omnaria_All --parallel 4
+        run: cmake --build build --config Release --target Omnaria_All OmnariaPresetQA --parallel 4
 
-      - name: Upload plug-ins
+      - name: Run 48-preset QA
+        run: |
+          mkdir -p qa-output
+          build/OmnariaPresetQA_artefacts/Release/OmnariaPresetQA qa-output/omnaria-preset-qa.json
+
+      - name: Stage LATHAMAUDIO plug-ins
+        run: |
+          mkdir -p package/LATHAMAUDIO/VST3 package/LATHAMAUDIO/Components package/LATHAMAUDIO/Standalone
+          cp -R build/Omnaria_artefacts/Release/VST3/OMNARIA.vst3 package/LATHAMAUDIO/VST3/
+          cp -R build/Omnaria_artefacts/Release/AU/OMNARIA.component package/LATHAMAUDIO/Components/
+          cp -R build/Omnaria_artefacts/Release/Standalone/OMNARIA.app package/LATHAMAUDIO/Standalone/
+          cat > package/LATHAMAUDIO/INSTALL.txt <<'EOF'
+          LATHAMAUDIO — OMNARIA macOS
+
+          VST3:
+            Copy OMNARIA.vst3 to:
+            ~/Library/Audio/Plug-Ins/VST3/LATHAMAUDIO/
+
+          Audio Unit:
+            Copy OMNARIA.component to:
+            ~/Library/Audio/Plug-Ins/Components/LATHAMAUDIO/
+
+          Standalone:
+            Move OMNARIA.app to /Applications/LATHAMAUDIO/ or another Applications folder of your choice.
+
+          This package deliberately groups OMNARIA under LATHAMAUDIO to match the LATHAMAUDIO instrument family.
+          EOF
+
+      - name: Upload LATHAMAUDIO package
         uses: actions/upload-artifact@v4
         with:
-          name: Omnaria-macOS-universal
-          path: build/Omnaria_artefacts/Release
+          name: LATHAMAUDIO-OMNARIA-macOS-universal
+          path: package/LATHAMAUDIO
+          if-no-files-found: error
+
+      - name: Upload preset QA report
+        uses: actions/upload-artifact@v4
+        with:
+          name: Omnaria-preset-QA
+          path: qa-output/omnaria-preset-qa.json
           if-no-files-found: error
