@@ -38,6 +38,7 @@ target_sources(Omnaria
         Source/PluginEditor.cpp
         Source/PluginEditor.h
         Source/DiscoverEngine.h
+        Source/Phase7Discover.h
         Source/InstructionEngine.h
         Source/dsp/BandlimitedOscillator.h
         Source/dsp/NastyCell.h
