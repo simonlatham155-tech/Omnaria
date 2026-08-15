@@ -47,9 +47,9 @@ public:
             auto candidate = base;
             mutateCandidate(candidate, base, profile, wtf, locks, sampleAvailable, random);
             const auto distance = candidateDistance(base, candidate, locks);
-            const auto targetDistance = 0.025f + wtf * 0.34f;
+            const auto targetDistance = 0.018f + wtf * 0.135f;
             const auto quality = qualityPenalty(candidate, profile, wtf, sampleAvailable);
-            const auto score = std::abs(distance - targetDistance) * 3.2f + quality;
+            const auto score = std::abs(distance - targetDistance) * 4.0f + quality;
             if (score < bestScore)
             {
                 bestScore = score;
@@ -110,8 +110,13 @@ private:
             { "sample_position", Group::sample, 0.28f, 0.88f }, { "sample_scan", Group::sample, 0.30f, 0.90f },
             { "sample_jitter", Group::sample, 0.25f, 0.92f },
 
-            { "lfo1_rate", Group::mod, 0.32f, 0.76f }, { "lfo2_rate", Group::mod, 0.32f, 0.76f },
-            { "lfo3_rate", Group::mod, 0.32f, 0.76f }, { "lfo4_rate", Group::mod, 0.32f, 0.76f },
+            { "lfo1_rate", Group::mod, 0.32f, 0.76f }, { "lfo1_mode", Group::mod, 0.04f, 0.34f }, { "lfo1_sync", Group::mod, 0.03f, 0.38f },
+            { "lfo2_rate", Group::mod, 0.32f, 0.76f }, { "lfo2_mode", Group::mod, 0.04f, 0.34f }, { "lfo2_sync", Group::mod, 0.03f, 0.38f },
+            { "lfo3_rate", Group::mod, 0.32f, 0.76f }, { "lfo3_mode", Group::mod, 0.04f, 0.34f }, { "lfo3_sync", Group::mod, 0.03f, 0.38f },
+            { "lfo4_rate", Group::mod, 0.32f, 0.76f }, { "lfo4_mode", Group::mod, 0.04f, 0.34f }, { "lfo4_sync", Group::mod, 0.03f, 0.38f },
+            { "env1_attack", Group::mod, 0.28f, 0.68f }, { "env1_decay", Group::mod, 0.28f, 0.68f }, { "env1_sustain", Group::mod, 0.24f, 0.62f }, { "env1_release", Group::mod, 0.28f, 0.68f },
+            { "env2_attack", Group::mod, 0.28f, 0.68f }, { "env2_decay", Group::mod, 0.28f, 0.68f }, { "env2_sustain", Group::mod, 0.24f, 0.62f }, { "env2_release", Group::mod, 0.28f, 0.68f },
+            { "env3_attack", Group::mod, 0.28f, 0.68f }, { "env3_decay", Group::mod, 0.28f, 0.68f }, { "env3_sustain", Group::mod, 0.24f, 0.62f }, { "env3_release", Group::mod, 0.28f, 0.68f },
             { "macro1", Group::mod, 0.30f, 0.70f }, { "macro2", Group::mod, 0.30f, 0.70f },
             { "macro3", Group::mod, 0.30f, 0.70f }, { "macro4", Group::mod, 0.30f, 0.70f },
             { "mod1_source", Group::mod, 0.02f, 0.62f }, { "mod1_dest", Group::mod, 0.02f, 0.62f }, { "mod1_depth", Group::mod, 0.24f, 0.88f },
@@ -159,7 +164,7 @@ private:
         }
     }
 
-    int indexOf(const char* id) const
+    int indexOf(const juce::String& id) const
     {
         const auto& s = specs();
         for (size_t i = 0; i < s.size(); ++i)
@@ -167,7 +172,7 @@ private:
         return -1;
     }
 
-    float actual(const std::vector<float>& values, const char* id) const
+    float actual(const std::vector<float>& values, const juce::String& id) const
     {
         const auto index = indexOf(id);
         if (index < 0 || static_cast<size_t>(index) >= values.size()) return 0.0f;
@@ -175,7 +180,7 @@ private:
         return 0.0f;
     }
 
-    void setActual(std::vector<float>& values, const char* id, float value) const
+    void setActual(std::vector<float>& values, const juce::String& id, float value) const
     {
         const auto index = indexOf(id);
         if (index < 0 || static_cast<size_t>(index) >= values.size()) return;
@@ -213,7 +218,6 @@ private:
             values[i] = juce::jlimit(0.0f, 1.0f, values[i] + gaussianish() * radius);
         }
 
-        // Musical discrete choices are chosen from useful intervals rather than arbitrary semitones.
         if (! groupLocked(Group::core, locks))
         {
             if (random.nextFloat() < 0.08f + 0.38f * wtf) setActual(values, "oscA_shape", static_cast<float>(random.nextInt(3)));
@@ -229,7 +233,6 @@ private:
         if (! groupLocked(Group::nasty, locks))
         {
             if (random.nextFloat() < 0.04f + 0.45f * wtf) setActual(values, "nasty_model", static_cast<float>(random.nextInt(4)));
-            // At Familiar, an inactive NASTY stays mostly inactive. WTF is allowed to introduce it.
             if (actual(base, "nasty_amount") < 0.03f && wtf < 0.45f) setActual(values, "nasty_amount", 0.0f);
             else if (actual(base, "nasty_amount") < 0.03f && random.nextFloat() < 0.55f * wtf) setActual(values, "nasty_amount", 0.08f + random.nextFloat() * 0.55f * wtf);
         }
@@ -256,20 +259,19 @@ private:
 
     void mutateRoutes(std::vector<float>& values, float wtf, bool sampleAvailable, juce::Random& random) const
     {
-        // Familiar mostly adjusts existing depths. Past the midpoint, Discover may reroute a slot.
         for (int slot = 1; slot <= 4; ++slot)
         {
             const auto s = juce::String(slot);
-            const auto depthId = ("mod" + s + "_depth").toRawUTF8();
-            const auto sourceId = ("mod" + s + "_source").toRawUTF8();
-            const auto destId = ("mod" + s + "_dest").toRawUTF8();
+            const auto depthId = "mod" + s + "_depth";
+            const auto sourceId = "mod" + s + "_source";
+            const auto destId = "mod" + s + "_dest";
             if (wtf > 0.30f && random.nextFloat() < (wtf - 0.22f) * 0.42f)
             {
-                // Source indices: 1..17 are real sources after None. Brown/Stochastic get extra weight at WTF.
-                const auto source = random.nextFloat() < 0.44f * wtf ? (random.nextBool() ? 17 : 18) : 1 + random.nextInt(16);
-                // Avoid sample destinations when no material exists. Destination 1..15 = core/NASTY, 16..20 = SAMPLE.
-                const auto maxDest = sampleAvailable ? 21 : 16;
-                const auto dest = 1 + random.nextInt(maxDest - 1);
+                // Source actual indices: 1..17 are real sources; Brown=16, Stochastic=17.
+                const auto source = random.nextFloat() < 0.44f * wtf ? (random.nextBool() ? 16 : 17) : 1 + random.nextInt(15);
+                // Destination actual indices 1..15 are core/NASTY; 16..20 are SAMPLE.
+                const auto maxExclusive = sampleAvailable ? 21 : 16;
+                const auto dest = 1 + random.nextInt(maxExclusive - 1);
                 setActual(values, sourceId, static_cast<float>(source));
                 setActual(values, destId, static_cast<float>(dest));
                 setActual(values, depthId, (random.nextFloat() * 2.0f - 1.0f) * (0.18f + 0.62f * wtf));
@@ -284,9 +286,9 @@ private:
 
     void preserveProfile(std::vector<float>& values, Profile profile, float wtf) const
     {
-        if (wtf > 0.72f) return; // WTF is explicitly allowed to cross category boundaries.
+        if (wtf > 0.72f) return;
         const auto blend = 1.0f - wtf / 0.72f;
-        auto constrain = [&] (const char* id, float low, float high)
+        auto constrain = [&] (const juce::String& id, float low, float high)
         {
             const auto v = actual(values, id);
             if (v < low) setActual(values, id, juce::jmap(blend, v, low));
@@ -333,7 +335,6 @@ private:
         if (! sampleAvailable && actual(c, "sample_level") > 0.001f) penalty += 0.5f;
         if (sampleAvailable && actual(c, "sample_end") - actual(c, "sample_start") < 0.05f) penalty += 0.45f;
 
-        // Preserve playability at the familiar end; WTF still has a safety floor rather than a taste floor.
         if (wtf < 0.55f)
         {
             if (profile == Profile::pad && actual(c, "release") < 0.35f) penalty += 0.35f;
