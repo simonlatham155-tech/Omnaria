@@ -51,6 +51,34 @@ juce::AudioProcessorValueTreeState::ParameterLayout OmnariaAudioProcessor::creat
     layout.push_back(std::make_unique<juce::AudioParameterFloat>("sustain", "Sustain", juce::NormalisableRange<float>(0.0f, 1.0f), 0.76f));
     layout.push_back(std::make_unique<juce::AudioParameterFloat>("release", "Release", juce::NormalisableRange<float>(0.005f, 20.0f, 0.0f, 0.25f), 0.75f));
 
+    // Phase 2: one modulation language shared by CORE and later specialist engines.
+    for (int i = 1; i <= 4; ++i)
+    {
+        const auto suffix = juce::String(i);
+        layout.push_back(std::make_unique<juce::AudioParameterFloat>("lfo" + suffix + "_rate", "LFO " + suffix + " Rate", juce::NormalisableRange<float>(0.01f, 30.0f, 0.0f, 0.25f), i == 1 ? 1.0f : 0.25f * static_cast<float>(i)));
+        layout.push_back(std::make_unique<juce::AudioParameterChoice>("lfo" + suffix + "_mode", "LFO " + suffix + " Mode", juce::StringArray { "Free", "Retrig", "One Shot" }, 1));
+        layout.push_back(std::make_unique<juce::AudioParameterFloat>("macro" + suffix, "Macro " + suffix, juce::NormalisableRange<float>(0.0f, 1.0f), 0.0f));
+    }
+
+    for (int i = 1; i <= 3; ++i)
+    {
+        const auto suffix = juce::String(i);
+        layout.push_back(std::make_unique<juce::AudioParameterFloat>("env" + suffix + "_attack", "Env " + suffix + " Attack", juce::NormalisableRange<float>(0.001f, 10.0f, 0.0f, 0.25f), 0.01f));
+        layout.push_back(std::make_unique<juce::AudioParameterFloat>("env" + suffix + "_decay", "Env " + suffix + " Decay", juce::NormalisableRange<float>(0.001f, 10.0f, 0.0f, 0.25f), 0.40f));
+        layout.push_back(std::make_unique<juce::AudioParameterFloat>("env" + suffix + "_sustain", "Env " + suffix + " Sustain", juce::NormalisableRange<float>(0.0f, 1.0f), 0.0f));
+        layout.push_back(std::make_unique<juce::AudioParameterFloat>("env" + suffix + "_release", "Env " + suffix + " Release", juce::NormalisableRange<float>(0.005f, 20.0f, 0.0f, 0.25f), 0.25f));
+    }
+
+    const juce::StringArray modSources { "None", "LFO 1", "LFO 2", "LFO 3", "LFO 4", "Env 1", "Env 2", "Env 3", "Velocity", "Key", "Mod Wheel", "Aftertouch", "Macro 1", "Macro 2", "Macro 3", "Macro 4", "Brown", "Stochastic" };
+    const juce::StringArray modDestinations { "None", "Pitch", "Cutoff", "Resonance", "Osc Mix", "Detune", "Spread", "Drive", "Pulse Width" };
+    for (int i = 1; i <= 4; ++i)
+    {
+        const auto suffix = juce::String(i);
+        layout.push_back(std::make_unique<juce::AudioParameterChoice>("mod" + suffix + "_source", "Mod " + suffix + " Source", modSources, 0));
+        layout.push_back(std::make_unique<juce::AudioParameterChoice>("mod" + suffix + "_dest", "Mod " + suffix + " Destination", modDestinations, 0));
+        layout.push_back(std::make_unique<juce::AudioParameterFloat>("mod" + suffix + "_depth", "Mod " + suffix + " Depth", juce::NormalisableRange<float>(-1.0f, 1.0f, 0.001f), 0.0f));
+    }
+
     layout.push_back(std::make_unique<juce::AudioParameterFloat>("motion", "Motion", juce::NormalisableRange<float>(0.0f, 1.0f), 0.0f));
     layout.push_back(std::make_unique<juce::AudioParameterFloat>("history", "History", juce::NormalisableRange<float>(0.0f, 1.0f), 0.35f));
     layout.push_back(std::make_unique<juce::AudioParameterFloat>("focus", "Focus", juce::NormalisableRange<float>(0.0f, 1.0f), 0.78f));
@@ -186,6 +214,10 @@ void OmnariaAudioProcessor::randomiseDiscoverable()
     mutateLinear("history", 0.12f, 0.0f, 1.0f);
     mutateLinear("focus", 0.10f, 0.0f, 1.0f);
     mutateLinear("coupling", 0.12f, 0.0f, 1.0f);
+
+    // Discover may move macro values, but does not silently invent modulation routes yet.
+    for (int i = 1; i <= 4; ++i)
+        mutateLinear("macro" + juce::String(i), 0.12f, 0.0f, 1.0f);
 }
 
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
