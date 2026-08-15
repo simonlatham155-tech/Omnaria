@@ -3,6 +3,7 @@
 #include <JuceHeader.h>
 #include <array>
 #include "PluginProcessor.h"
+#include "DiscoverEngine.h"
 #include "ui/WorldGlobe.h"
 
 class ParamKnob final : public juce::Component
@@ -39,8 +40,12 @@ public:
 private:
     void showSpecialistPage(bool samplePage);
     void refreshSampleName();
+    unsigned int getDiscoverLocks() const noexcept;
+    void persistDiscoverSettings();
+    void refreshDiscoverUndo();
 
     OmnariaAudioProcessor& processor;
+    DiscoverEngine discoverEngine;
     omnaria::WorldGlobe globe;
 
     ParamCombo oscAShape, oscBShape, phaseMode;
@@ -76,7 +81,18 @@ private:
 
     juce::Label title;
     juce::Label subtitle;
+
+    // Phase 5 DISCOVER: compact header controls, no new permanent synthesis row.
     juce::TextButton discoverButton { "DISCOVER" };
+    juce::TextButton undoDiscoverButton { "UNDO" };
+    juce::Slider discoverWtf;
+    juce::Label familiarLabel;
+    juce::Label wtfLabel;
+    juce::Label lockLabel;
+    juce::TextButton lockCoreButton { "CORE" };
+    juce::TextButton lockNastyButton { "NASTY" };
+    juce::TextButton lockSampleButton { "SAMPLE" };
+    juce::TextButton lockModButton { "MOD" };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(OmnariaAudioProcessorEditor)
 };
