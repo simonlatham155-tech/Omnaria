@@ -1,6 +1,7 @@
 #pragma once
 
 #include <JuceHeader.h>
+#include <array>
 #include "PluginProcessor.h"
 #include "ui/WorldGlobe.h"
 
@@ -81,6 +82,13 @@ private:
     ParamKnob focus;
     ParamKnob coupling;
     ParamKnob output;
+
+    std::array<std::unique_ptr<ParamKnob>, 4> lfoRates;
+    std::array<std::unique_ptr<ParamCombo>, 4> lfoModes;
+    std::array<std::unique_ptr<ParamKnob>, 4> macros;
+    std::array<std::unique_ptr<ParamCombo>, 4> modSources;
+    std::array<std::unique_ptr<ParamCombo>, 4> modDestinations;
+    std::array<std::unique_ptr<ParamKnob>, 4> modDepths;
 
     juce::Label title;
     juce::Label subtitle;
