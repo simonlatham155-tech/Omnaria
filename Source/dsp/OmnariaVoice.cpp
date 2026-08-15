@@ -284,9 +284,8 @@ void OmnariaVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int s
         advanceLfos(); advanceStochasticSources();
         for (int i = 0; i < auxEnvelopeCount; ++i) auxEnvelopeValues[i] = auxEnvelopes[i].getNextSample();
         const auto frame = buildModFrame();
-        const auto detuneCents = juce::jmax(0.0f, baseDetuneCents + frame.detuneCents);
-        const auto exponent = juce::jmap(juce::jlimit(0.0f, 1.0f, detuneCents / 35.0f), 0.88f, 0.58f);
-        const auto unisonNormalisation = 0.90f / std::pow(static_cast<float>(unisonCount), exponent);
+        const auto rawDetuneCents = juce::jmax(0.0f, baseDetuneCents + frame.detuneCents);
+        const auto detuneCents = SupersawLaw::pitchAwareDetune(rawDetuneCents, baseHz);
 
         if ((sample & 7) == 0)
         {
@@ -309,7 +308,8 @@ void OmnariaVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int s
         {
             const auto stereoPosition = SupersawLaw::stereoPosition(i, unisonCount);
             const auto pan = juce::jlimit(-1.0f, 1.0f, stereoPosition * spread);
-            const auto source = juce::jmap(mix, oscillatorA[i].process(), oscillatorB[i].process()) * unisonNormalisation;
+            const auto voiceGain = SupersawLaw::voiceGain(i, unisonCount, detuneCents);
+            const auto source = juce::jmap(mix, oscillatorA[i].process(), oscillatorB[i].process()) * voiceGain;
             left += source * std::sqrt(0.5f * (1.0f - pan)); right += source * std::sqrt(0.5f * (1.0f + pan));
         }
         const auto centredSub = subOscillator.process() * subLevel * 0.55f;
