@@ -3,7 +3,7 @@
 #include <JuceHeader.h>
 #include <array>
 #include "BandlimitedOscillator.h"
-#include "LatWorldState.h"
+#include "OmnariaState.h"
 
 namespace omnaria
 {
@@ -17,7 +17,7 @@ public:
 class OmnariaVoice final : public juce::SynthesiserVoice
 {
 public:
-    OmnariaVoice(juce::AudioProcessorValueTreeState& parameters, const LatWorldState& worldState);
+    OmnariaVoice(juce::AudioProcessorValueTreeState& parameters, const OmnariaState& sharedState);
 
     bool canPlaySound(juce::SynthesiserSound* sound) override;
     void prepare(double sampleRate, int maximumBlockSize);
@@ -36,7 +36,7 @@ private:
     float pitchWheelRatio() const noexcept;
 
     juce::AudioProcessorValueTreeState& params;
-    const LatWorldState& world;
+    const OmnariaState& state;
 
     std::array<BandlimitedOscillator, maxUnison> oscillatorA;
     std::array<BandlimitedOscillator, maxUnison> oscillatorB;
