@@ -40,9 +40,20 @@ public:
             if (auto* ranged = dynamic_cast<juce::RangedAudioParameter*>(p))
                 ranged->setValueNotifyingHost(ranged->getDefaultValue());
 
+        // Phase 10 normal-bank cleanup: the 48 musical presets are evaluated separately
+        // from NASTY. Legacy nasty_* coefficients remain in FactoryPresets.h as design
+        // history until the dedicated NASTY recipe pass, but they are deliberately not
+        // applied by the normal factory bank. This guarantees a normal preset cannot
+        // accidentally engage an unvalidated nonlinear recipe.
         for (const auto& value : bank[static_cast<size_t>(index)].values)
-            if (auto* p = parameters.getParameter(value.id))
+        {
+            const juce::String parameterID(value.id);
+            if (parameterID.startsWith("nasty_"))
+                continue;
+
+            if (auto* p = parameters.getParameter(parameterID))
                 p->setValueNotifyingHost(p->convertTo0to1(value.value));
+        }
 
         currentProgram = index;
         parameters.state.setProperty("factory_program", currentProgram, nullptr);
