@@ -72,7 +72,7 @@ private:
     static float antialiasedTanh(float x, float& previousX) noexcept;
 
     void configureAuxEnvelopes();
-    void advanceLfos();
+    void advanceLfos(int sampleSteps);
     void advanceStochasticSources();
     float modulationSourceValue(int sourceIndex) const noexcept;
     ModFrame buildModFrame() const noexcept;
