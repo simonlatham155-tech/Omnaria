@@ -89,19 +89,23 @@ def eigenspace_rotation_deg(g0: np.ndarray, g1: np.ndarray) -> float:
 
 
 def robust_z(x: np.ndarray) -> np.ndarray:
+    """Robust standardisation with a variance floor for near-flat traces."""
     x = np.asarray(x, dtype=float)
     finite = np.isfinite(x)
     out = np.zeros_like(x)
     if not finite.any():
         return out
-    med = np.median(x[finite])
-    mad = np.median(np.abs(x[finite] - med))
-    scale = 1.4826 * mad
-    if scale <= EPS:
-        scale = np.std(x[finite])
+    vals = x[finite]
+    med = np.median(vals)
+    mad_scale = 1.4826 * np.median(np.abs(vals - med))
+    std_scale = np.std(vals)
+    # Pure MAD can be arbitrarily tiny when most path samples are flat. A
+    # small fraction of global std prevents numerical score explosions while
+    # preserving sensitivity to a narrow transition peak.
+    scale = max(float(mad_scale), float(std_scale) * 0.10, EPS)
     if scale <= EPS:
         return out
-    out[finite] = (x[finite] - med) / scale
+    out[finite] = (vals - med) / scale
     return out
 
 
