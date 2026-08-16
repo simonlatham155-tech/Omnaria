@@ -38,6 +38,7 @@ private:
     static constexpr int lfoCount = 4;
     static constexpr int auxEnvelopeCount = 3;
     static constexpr int modSlotCount = 4;
+    static constexpr int controlRateStride = 16;
 
     struct ModFrame
     {
@@ -106,6 +107,8 @@ private:
     std::array<float, lfoCount> lfoValues { 0.0f, 0.0f, 0.0f, 0.0f };
     std::array<bool, lfoCount> lfoOneShotComplete { false, false, false, false };
     std::array<float, auxEnvelopeCount> auxEnvelopeValues { 0.0f, 0.0f, 0.0f };
+    ModFrame cachedModFrame;
+    int controlRateCounter { 0 };
 
     juce::Random noiseRandom { 0x4f4d4e49 };
     double currentSampleRate { 44100.0 };
