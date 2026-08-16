@@ -62,6 +62,8 @@ void OmnariaVoice::prepare(double sampleRate, int maximumBlockSize)
     glideStartCents = 0.0f;
     pmCarrierPhase = pmModPhase = 0.0f;
     voiceNoteSerial = 0;
+    cachedModFrame = {};
+    controlRateCounter = 0;
 }
 
 void OmnariaVoice::startNote(int midiNoteNumber, float velocity, juce::SynthesiserSound*, int currentPitchWheelPosition)
@@ -75,6 +77,8 @@ void OmnariaVoice::startNote(int midiNoteNumber, float velocity, juce::Synthesis
     glideStartCents = -state.glideIntervalCents.load();
     voiceNoteSerial = state.noteOnSerial.load();
     pmCarrierPhase = pmModPhase = 0.0f;
+    cachedModFrame = {};
+    controlRateCounter = 0;
     nastyCell.reset();
 
     const bool randomPhase = parameter("phase_mode") >= 0.5f;
@@ -161,10 +165,11 @@ void OmnariaVoice::configureAuxEnvelopes()
     }
 }
 
-void OmnariaVoice::advanceLfos()
+void OmnariaVoice::advanceLfos(int sampleSteps)
 {
     const auto bpm = juce::jmax(20.0f, state.bpm.load());
     constexpr float beatMultipliers[] { 0.0f, 0.25f, 0.5f, 1.0f, 2.0f, 4.0f, 8.0f, 16.0f };
+    const auto elapsed = static_cast<double>(juce::jmax(1, sampleSteps)) / currentSampleRate;
     for (int i = 0; i < lfoCount; ++i)
     {
         const auto suffix = juce::String(i + 1);
@@ -176,7 +181,7 @@ void OmnariaVoice::advanceLfos()
         auto& complete = lfoOneShotComplete[static_cast<size_t>(i)];
         if (! complete)
         {
-            phase += rateHz / currentSampleRate;
+            phase += static_cast<double>(rateHz) * elapsed;
             if (phase >= 1.0)
             {
                 if (mode == 2) { phase = 1.0; complete = true; }
@@ -326,9 +331,23 @@ void OmnariaVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int s
 
     for (int sample = 0; sample < numSamples; ++sample)
     {
-        advanceLfos(); advanceStochasticSources();
+        advanceStochasticSources();
         for (int i = 0; i < auxEnvelopeCount; ++i) auxEnvelopeValues[i] = auxEnvelopes[i].getNextSample();
-        const auto frame = buildModFrame();
+
+        // LFO routing and destination lookup are control-rate work. The previous build
+        // rebuilt strings and queried the APVTS for every modulation route on every
+        // audio sample in every active voice. At 32-note polyphony this was needlessly
+        // expensive. 16-sample control-rate updates are still >2.7 kHz at 44.1 kHz,
+        // well above the modulation bandwidth used here, while preserving sample-rate
+        // stochastic evolution and audio-rate envelopes.
+        if (controlRateCounter <= 0)
+        {
+            advanceLfos(controlRateStride);
+            cachedModFrame = buildModFrame();
+            controlRateCounter = controlRateStride;
+        }
+        --controlRateCounter;
+        const auto& frame = cachedModFrame;
 
         float residualCents = 0.0f;
         float glideVelocity = 0.0f;
@@ -382,9 +401,6 @@ void OmnariaVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int s
             right += source * std::sqrt(0.5f * (1.0f + pan));
         }
 
-        // A8/A2: a pitch-tracked PM layer whose index is excited by the actual
-        // note-transition gesture. It adds upper identifying information without
-        // moving the CORE pitch centre. Alias-aware allocation retreats near Nyquist.
         const auto gesture = juce::jmax(state.glideExcitation.load(), glideVelocity);
         const auto pmModHz = currentBaseHz * 2.0f;
         const auto requestedPm = pmAmount * (0.20f + 0.80f * gesture);
@@ -418,13 +434,17 @@ void OmnariaVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int s
             (void) resonator.process();
         }
 
-        auto randomTexture = stochasticState * 0.7f + brownState * 0.3f;
-        const auto samplePair = sampleVoice.process(parameter("sample_tune") + frame.sampleTune, sampleMode,
-                                                    juce::jlimit(-1.0f, 1.0f, parameter("sample_position") * 2.0f - 1.0f + frame.samplePosition),
-                                                    juce::jlimit(0.0f, 1.0f, parameter("sample_scan") + frame.sampleScan),
-                                                    juce::jlimit(0.0f, 1.0f, parameter("sample_jitter") + frame.sampleJitter), randomTexture);
         const auto sampleLevel = juce::jlimit(0.0f, 1.0f, parameter("sample_level") + frame.sampleLevel);
-        left += samplePair.first * sampleLevel; right += samplePair.second * sampleLevel;
+        if (sampleLevel > 0.0001f)
+        {
+            const auto randomTexture = stochasticState * 0.7f + brownState * 0.3f;
+            const auto samplePair = sampleVoice.process(parameter("sample_tune") + frame.sampleTune, sampleMode,
+                                                        juce::jlimit(-1.0f, 1.0f, parameter("sample_position") * 2.0f - 1.0f + frame.samplePosition),
+                                                        juce::jlimit(0.0f, 1.0f, parameter("sample_scan") + frame.sampleScan),
+                                                        juce::jlimit(0.0f, 1.0f, parameter("sample_jitter") + frame.sampleJitter), randomTexture);
+            left += samplePair.first * sampleLevel;
+            right += samplePair.second * sampleLevel;
+        }
 
         const auto amp = ampEnvelope.getNextSample() * noteVelocity;
         const auto filterEnv = filterEnvelope.getNextSample();
@@ -434,9 +454,13 @@ void OmnariaVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int s
         if (driveDb > 0.01f)
         {
             const auto gain = juce::Decibels::decibelsToGain(driveDb) * (1.0f + velocityTimbre * noteVelocity * 0.35f);
-            const auto norm = 1.0f / juce::jmax(0.25f, std::tanh(gain));
-            left = antialiasedTanh(left * gain, previousDriveInputL) * norm;
-            right = antialiasedTanh(right * gain, previousDriveInputR) * norm;
+            // Drive should change harmonic density, not act as an uncontrolled gain
+            // multiplier. sqrt compensation preserves useful saturation growth while
+            // preventing driven normal presets from arriving at the next stage near
+            // full-scale simply because drive was increased.
+            const auto compensation = 1.0f / std::sqrt(juce::jmax(1.0f, gain));
+            left = antialiasedTanh(left * gain, previousDriveInputL) * compensation;
+            right = antialiasedTanh(right * gain, previousDriveInputR) * compensation;
         }
 
         const auto nastyAmount = juce::jlimit(0.0f, 1.0f, parameter("nasty_amount") + frame.nastyAmount);
@@ -463,8 +487,6 @@ void OmnariaVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int s
         left = filterA.processSample(0, left); right = filterA.processSample(1, right);
         if (filterMode == 1) { left = filterB.processSample(0, left); right = filterB.processSample(1, right); }
 
-        // A13: formant identity is a separate resonant target rather than ordinary
-        // filter resonance. Coupling is the temporary default-off amount control.
         if (formantAmount > 0.0001f)
         {
             const auto formantBase = 900.0f + 1900.0f * velocityTimbre;
@@ -489,6 +511,12 @@ void OmnariaVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int s
         const auto gateGain = juce::jmap(gateAmount, 1.0f, rhythmicGate);
         left *= gateGain;
         right *= gateGain;
+
+        // A hard finite-value guard is allowed at runtime; it does not hide overload or
+        // alter a valid signal. It only prevents a pathological DSP state from poisoning
+        // the host buffer while QA identifies the upstream cause.
+        if (! std::isfinite(left)) left = 0.0f;
+        if (! std::isfinite(right)) right = 0.0f;
 
         const auto target = startSample + sample;
         if (numChannels > 0) outputBuffer.addSample(0, target, left);
