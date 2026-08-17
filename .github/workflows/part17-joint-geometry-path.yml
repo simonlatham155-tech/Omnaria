@@ -1,0 +1,26 @@
+name: Part 17 joint geometry path
+
+on:
+  push:
+    branches: [research/part6-chart-transitions]
+    paths:
+      - 'research/part17_joint_geometry_path.py'
+      - '.github/workflows/part17-joint-geometry-path.yml'
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install numpy
+      - run: python research/part17_joint_geometry_path.py
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: part17-result
+          path: research/data/part17/part17_result.json
+          if-no-files-found: warn
