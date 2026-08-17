@@ -1,0 +1,49 @@
+name: Part 9 adversarial persistence
+on:
+  push:
+    branches: [research/part6-chart-transitions]
+    paths:
+      - 'research/part9_adversarial_renderer.py'
+      - 'research/part9_regenerate.py'
+      - '.github/workflows/part9-adversarial-persistence.yml'
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install --upgrade pip numpy
+      - name: Regenerate Part 9 suite
+        run: python research/part9_regenerate.py
+      - name: Score frozen persistence metric
+        run: |
+          set -e
+          for f in research/data/part9_adversarial/*.npz; do
+            key=$(basename "$f" .npz)
+            python research/part8_persistence_score.py "$f" --out "research/data/part9_adversarial/${key}.json"
+          done
+      - name: Evaluate preregistered criteria
+        run: |
+          python - <<'PY'
+          import json, pathlib
+          root=pathlib.Path('research/data/part9_adversarial')
+          targets={'subtle_waveshape_to_fm':0.27,'subtle_modal_to_additive':0.81}
+          negatives=['smooth_accumulating_fm','smooth_accumulating_additive']
+          out={'positives':{},'negatives':{},'overall_pass':True}
+          for k,t in targets.items():
+              r=json.loads((root/f'{k}.json').read_text()); e=abs(r['peak_t']-t); ok=e<=0.05+1e-12
+              out['positives'][k]={'ground_truth':t,**r,'abs_error':e,'pass':ok}; out['overall_pass'] &= ok
+          for k in negatives:
+              r=json.loads((root/f'{k}.json').read_text()); ok=r['peak_ratio']<50
+              out['negatives'][k]={**r,'pass':ok}; out['overall_pass'] &= ok
+          (root/'part9_result.json').write_text(json.dumps(out,indent=2)+'\n')
+          print(json.dumps(out,indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: part9-adversarial-persistence
+          path: research/data/part9_adversarial/
