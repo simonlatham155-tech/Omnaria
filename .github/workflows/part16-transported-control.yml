@@ -1,0 +1,26 @@
+name: Part 16 transported control
+
+on:
+  push:
+    branches: [research/part6-chart-transitions]
+    paths:
+      - 'research/part16_transported_control_basis.py'
+      - '.github/workflows/part16-transported-control.yml'
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install numpy
+      - run: python research/part16_transported_control_basis.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: part16-result
+          path: research/data/part16/part16_result.json
+          if-no-files-found: warn
