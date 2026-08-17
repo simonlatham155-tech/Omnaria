@@ -39,7 +39,9 @@
   "success_criteria": {
     "positive_location_tolerance": 0.05,
     "positive_requirement": "frozen-rule peak must lie within 0.05 of each positive control's preregistered ground-truth transition center",
-    "negative_requirement": "negative controls must not show a transition peak prominence greater than 3.0 times their median transition score",
+    "negative_peak_prominence_definition": "(max frozen score - median frozen score) / (1.4826 * MAD + 1e-12)",
+    "negative_peak_prominence_limit": 3.0,
+    "negative_requirement": "both negative controls must have robust frozen-score peak prominence <= 3.0",
     "overall_pass": "both positive controls pass ground-truth location tolerance and both negative controls pass the no-concentrated-transition requirement"
   },
   "interpretation_boundary": "Passing this suite would show transfer beyond the reconstructed OMNARIA handoff schedule, but would still not establish a universal synthesis law."
