@@ -44,6 +44,7 @@ void Engine3Voice::startNote(int midiNoteNumber, float velocity, juce::Synthesis
     modPhase = 0.0;
     crossPhase = 0.31;
     smoothedNoise = 0.0;
+    dcIn = dcOut = 0.0;
     noiseState = 0x9e3779b9u ^ static_cast<uint32_t>(midiNoteNumber * 2654435761u);
 
     adsrParams.attack  = *params.attack;
@@ -118,9 +119,7 @@ void Engine3Voice::renderNextBlock(juce::AudioBuffer<float>& output, int startSa
         double x = bank + exc;
         x = std::tanh(drive * (x + bias)) / tanhNorm;
 
-        // Remove most of the DC introduced by asymmetric shaping without changing the core interaction.
         static constexpr double dcLeak = 0.9995;
-        static thread_local double dcIn = 0.0, dcOut = 0.0;
         const double hp = x - dcIn + dcLeak * dcOut;
         dcIn = x;
         dcOut = hp;
