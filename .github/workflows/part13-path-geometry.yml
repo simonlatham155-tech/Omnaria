@@ -1,0 +1,22 @@
+name: Part 13 richer path geometry
+on:
+  workflow_dispatch:
+  push:
+    branches: [research/part6-chart-transitions]
+    paths:
+      - 'research/part13_path_geometry.py'
+      - '.github/workflows/part13-path-geometry.yml'
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install --upgrade pip numpy
+      - run: python research/part13_path_geometry.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: part13-path-geometry
+          path: research/data/part13/part13_result.json
