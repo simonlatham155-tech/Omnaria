@@ -1,0 +1,23 @@
+name: Part 15 joint regularized
+on:
+  workflow_dispatch:
+  push:
+    branches: [research/part6-chart-transitions]
+    paths:
+      - research/part15_joint_regularized_engine.py
+      - .github/workflows/part15-joint-regularized.yml
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install numpy
+      - run: python research/part15_joint_regularized_engine.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: part15-result
+          path: research/data/part15/part15_result.json
