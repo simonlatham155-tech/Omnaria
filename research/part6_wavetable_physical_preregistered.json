@@ -1,0 +1,15 @@
+{
+  "test": "Wavetable_to_Physical_prospective",
+  "predictor_frozen": true,
+  "weights": {"D_G": 0.5, "rotation": 0.5, "log10_kappa": 0.0, "sound_penalty": 1.0},
+  "samples": 41,
+  "success_criterion": {
+    "location_tolerance": 0.025,
+    "description": "Frozen-rule predicted handoff midpoint must lie within one 41-point sampling interval of the independently detected observed midpoint."
+  },
+  "secondary_checks": [
+    "forward/reverse observed handoff reproduction",
+    "sound-step ratio reported but not used to redefine success"
+  ],
+  "note": "Preregistered before generating the Wavetable-to-Physical trace."
+}
