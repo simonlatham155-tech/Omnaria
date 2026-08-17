@@ -1,0 +1,44 @@
+{
+  "phase": "Part 7 external falsification",
+  "status": "preregistered before trace generation",
+  "frozen_rule": {
+    "D_G": 0.5,
+    "rotation": 0.5,
+    "log10_kappa": 0.0,
+    "sound_penalty": 1.0
+  },
+  "positive_controls": [
+    {
+      "name": "independent_linear_additive_fm",
+      "architecture": "independent additive and FM algorithms joined only by linear amplitude interpolation",
+      "omnaria_handoff_schedule_used": false
+    },
+    {
+      "name": "independent_sigmoid_modal_noise",
+      "architecture": "independent modal resonator and stochastic-noise algorithms joined by an externally specified sigmoid interpolation centered at 0.43",
+      "omnaria_handoff_schedule_used": false
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "single_engine_continuous_fm",
+      "architecture": "one FM algorithm whose modulation index and ratio vary smoothly with alpha; no engine or chart switch is present"
+    },
+    {
+      "name": "single_engine_continuous_additive",
+      "architecture": "one additive algorithm whose spectral tilt and inharmonicity vary smoothly with alpha; no engine or chart switch is present"
+    }
+  ],
+  "sampling": {
+    "points": 41,
+    "sample_rate_hz": 48000,
+    "seed": 1618033
+  },
+  "success_criteria": {
+    "positive_location_tolerance": 0.05,
+    "positive_requirement": "frozen-rule peak must lie within 0.05 of the independently detected strongest geometry transition in both positive controls",
+    "negative_requirement": "negative controls must not show a transition peak prominence greater than 3.0 times their median transition score",
+    "overall_pass": "both positive controls pass location tolerance and both negative controls pass the no-concentrated-transition requirement"
+  },
+  "interpretation_boundary": "Passing this suite would show transfer beyond the reconstructed OMNARIA handoff schedule, but would still not establish a universal synthesis law."
+}
