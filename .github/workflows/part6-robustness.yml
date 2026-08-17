@@ -1,0 +1,49 @@
+name: Part 6 robustness
+on:
+  push:
+    branches: [research/part6-chart-transitions]
+    paths:
+      - 'research/part6_regenerate_robustness.py'
+      - 'research/part6_robustness_preregistration.json'
+      - '.github/workflows/part6-robustness.yml'
+  workflow_dispatch:
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install --upgrade pip numpy
+      - name: Regenerate robustness matrix
+        run: python research/part6_regenerate_robustness.py --samples 41 --out-dir research/data/part6_robustness
+      - name: Detect and score matrix
+        run: |
+          set -e
+          for f in research/data/part6_robustness/*_forward.npz; do
+            key=$(basename "$f" _forward.npz)
+            python research/part6_chart_transition.py "$f" --reverse "research/data/part6_robustness/${key}_reverse.npz" --out "research/data/part6_robustness/${key}_detected.json"
+            python research/part6_score_frozen_rule.py "research/data/part6_robustness/${key}_detected.json" --out "research/data/part6_robustness/${key}_frozen.json"
+          done
+      - name: Evaluate preregistered robustness criterion
+        run: |
+          python - <<'PY'
+          import json, pathlib
+          root=pathlib.Path('research/data/part6_robustness')
+          pre=json.loads(pathlib.Path('research/part6_robustness_preregistration.json').read_text())
+          tol=float(pre['success_tolerance']); out={'tolerance':tol,'cases':{},'pass_count':0,'total':0,'by_variant':{}}
+          manifest=json.loads((root/'manifest.json').read_text())
+          for key,meta in manifest.items():
+              det=json.loads((root/f'{key}_detected.json').read_text()); pred=json.loads((root/f'{key}_frozen.json').read_text())
+              obs=float(det['bidirectional']['forward_transition_midpoint']); guess=float(pred['predicted_handoff_midpoint']); err=abs(obs-guess); ok=err <= tol+1e-12
+              rec={'observed':obs,'predicted':guess,'abs_error':err,'success':ok,'pair':meta['pair'],'variant':meta['variant'],'bidirectional_reproduction':bool(det['bidirectional']['bidirectional_reproduction']),'sound_ratio':float(det['forward']['candidate_sound_ratio_to_median']),'rotation_deg':float(det['forward']['candidate_rotation_deg'])}
+              out['cases'][key]=rec; out['total']+=1; out['pass_count']+=int(ok)
+              v=out['by_variant'].setdefault(meta['variant'],{'pass':0,'total':0}); v['total']+=1; v['pass']+=int(ok)
+          out['threshold_pass']=out['pass_count']>=9 and all(v['pass']>0 for v in out['by_variant'].values())
+          (root/'robustness_result.json').write_text(json.dumps(out,indent=2)); print(json.dumps(out,indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: part6-robustness
+          path: research/data/part6_robustness/
