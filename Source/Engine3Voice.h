@@ -46,6 +46,8 @@ private:
     double modPhase = 0.0;
     double crossPhase = 0.31;
     double smoothedNoise = 0.0;
+    double dcIn = 0.0;
+    double dcOut = 0.0;
     uint32_t noiseState = 0x12345678u;
 
     float noise();
