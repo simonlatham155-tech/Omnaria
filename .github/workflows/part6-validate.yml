@@ -1,0 +1,36 @@
+name: Part 6 validation
+
+on:
+  push:
+    branches:
+      - research/part6-chart-transitions
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install --upgrade pip numpy
+      - name: Regenerate traces
+        run: |
+          python research/part6_regenerate_additive_granular_v3.py --samples 41 --seed 618033
+          python research/part6_regenerate_modal_waveterrain.py --samples 41 --seed 618033
+          python research/part6_regenerate_physical_nonlinearchaos.py --samples 41 --seed 618033
+      - name: Detect handoffs
+        run: |
+          python research/part6_chart_transition.py research/data/part6/additive_granular_forward_RECONSTRUCTED_RESEARCH_V3.npz --reverse research/data/part6/granular_additive_reverse_RECONSTRUCTED_RESEARCH_V3.npz --out research/data/part6/additive_granular_trace.json
+          python research/part6_chart_transition.py research/data/part6/modal_waveterrain_forward_FROZEN_LAW.npz --reverse research/data/part6/waveterrain_modal_reverse_FROZEN_LAW.npz --out research/data/part6/modal_waveterrain_trace.json
+          python research/part6_chart_transition.py research/data/part6/physical_nonlinearchaos_forward_FROZEN_LAW.npz --reverse research/data/part6/nonlinearchaos_physical_reverse_FROZEN_LAW.npz --out research/data/part6/physical_nonlinearchaos_trace.json
+      - name: Fit predictive rule
+        run: |
+          python research/part6_predictive_handoff_rule.py research/data/part6/additive_granular_trace.json research/data/part6/modal_waveterrain_trace.json research/data/part6/physical_nonlinearchaos_trace.json --targets 0.7875 0.7875 0.0625 --out research/data/part6/predictive_rule.json
+          python research/part6_leave_one_pair_out.py research/data/part6/additive_granular_trace.json research/data/part6/modal_waveterrain_trace.json research/data/part6/physical_nonlinearchaos_trace.json --targets 0.7875 0.7875 0.0625 --names additive_granular modal_waveterrain physical_nonlinearchaos --out research/data/part6/leave_one_pair_out.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: part6-validation
+          path: research/data/part6/
