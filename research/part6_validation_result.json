@@ -1,0 +1,54 @@
+{
+  "workflow_run_id": 31994019870,
+  "workflow_commit": "606d06932d2527def48df8ad4991e3fb2f462abe",
+  "status": "completed_successfully",
+  "observed_targets": {
+    "additive_granular": 0.7875,
+    "modal_waveterrain": 0.7875,
+    "physical_nonlinearchaos": 0.0625
+  },
+  "in_sample_rule": {
+    "weights": {
+      "D_G": 0.5,
+      "rotation": 0.5,
+      "log10_kappa": 0.0,
+      "sound_penalty": 1.0
+    },
+    "predictions": {
+      "additive_granular": 0.7875,
+      "modal_waveterrain": 0.7875,
+      "physical_nonlinearchaos": 0.0625
+    },
+    "mean_squared_location_error": 8.217301096052206e-33,
+    "interpretation": "Exact in-sample fit only; not evidence of a general law without hold-out success."
+  },
+  "leave_one_pair_out": {
+    "folds": [
+      {
+        "held_out": "additive_granular",
+        "target": 0.7875,
+        "prediction": 0.4625,
+        "abs_error": 0.325,
+        "weights": {"D_G": 0.0, "rotation": 0.5, "log10_kappa": 0.5, "sound_penalty": 1.0}
+      },
+      {
+        "held_out": "modal_waveterrain",
+        "target": 0.7875,
+        "prediction": 0.0625,
+        "abs_error": 0.725,
+        "weights": {"D_G": 0.5, "rotation": 2.0, "log10_kappa": 0.0, "sound_penalty": 0.0}
+      },
+      {
+        "held_out": "physical_nonlinearchaos",
+        "target": 0.0625,
+        "prediction": 0.0625,
+        "abs_error": 0.0,
+        "weights": {"D_G": 0.5, "rotation": 0.5, "log10_kappa": 0.0, "sound_penalty": 1.0}
+      }
+    ],
+    "mean_abs_error": 0.35,
+    "max_abs_error": 0.725,
+    "family_labels_used_in_predictor": false
+  },
+  "conclusion": "The current three-pair dataset does not support a learned universal predictive handoff rule. The exact in-sample rule is a candidate to freeze prospectively and test on entirely unseen family pairs."
+}
