@@ -1,0 +1,27 @@
+name: Engine 3 Test VST3
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-macos:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        run: cmake --build build --config Release --target OmnariaEngine3Test_VST3 OmnariaEngine3Test_Standalone -j 3
+      - name: Collect artifacts
+        run: |
+          mkdir -p dist
+          find build -name "*.vst3" -exec cp -R {} dist/ \;
+          find build -type f -perm +111 -name "Omnaria Engine 3 Test" -exec cp {} dist/OmnariaEngine3Test-Standalone \; || true
+          ls -la dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Omnaria-Engine3-Test-macOS
+          path: dist
+          if-no-files-found: error
