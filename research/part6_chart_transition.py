@@ -8,10 +8,6 @@ Consumes sampled synthesis paths containing:
 Optional:
   coupling       shape (N,) e.g. PartialDensity↔TransientComplexity
 
-NPZ example:
-  np.savez('additive_granular_forward.npz',
-           t=t, sound_features=features, jacobians=J, coupling=c)
-
 The script measures whether local generative geometry reorganises while the
 acoustic trajectory remains continuous.
 """
@@ -31,6 +27,7 @@ EPS = 1e-12
 class TransitionPoint:
     index: int
     t: float
+    segment_midpoint: float
     sound_step: float
     metric_step: float
     eigenspace_rotation_deg: float
@@ -40,7 +37,6 @@ class TransitionPoint:
 
 
 def pullback_metric(j: np.ndarray, weights: np.ndarray | None = None) -> np.ndarray:
-    """G = Jᵀ W J, with optional positive feature weights."""
     if weights is None:
         return j.T @ j
     w = np.asarray(weights, dtype=float)
@@ -50,8 +46,7 @@ def pullback_metric(j: np.ndarray, weights: np.ndarray | None = None) -> np.ndar
 
 
 def stable_condition_number(g: np.ndarray, relative_floor: float = 1e-8) -> float:
-    vals = np.linalg.eigvalsh(g)
-    vals = np.clip(vals, 0.0, None)
+    vals = np.clip(np.linalg.eigvalsh(g), 0.0, None)
     vmax = float(vals[-1]) if vals.size else 0.0
     if vmax <= EPS:
         return float("inf")
@@ -69,27 +64,23 @@ def dominant_basis(g: np.ndarray, energy: float = 0.9, max_rank: int | None = No
     total = float(vals.sum())
     if total <= EPS:
         return vecs[:, :1]
-    cumulative = np.cumsum(vals) / total
-    rank = int(np.searchsorted(cumulative, energy) + 1)
+    rank = int(np.searchsorted(np.cumsum(vals) / total, energy) + 1)
     if max_rank is not None:
         rank = min(rank, max_rank)
     return vecs[:, :max(1, rank)]
 
 
 def eigenspace_rotation_deg(g0: np.ndarray, g1: np.ndarray) -> float:
-    """Largest principal angle between dominant local metric subspaces."""
     b0 = dominant_basis(g0)
     b1 = dominant_basis(g1)
     rank = min(b0.shape[1], b1.shape[1])
-    b0, b1 = b0[:, :rank], b1[:, :rank]
-    s = np.linalg.svd(b0.T @ b1, compute_uv=False)
+    s = np.linalg.svd(b0[:, :rank].T @ b1[:, :rank], compute_uv=False)
     s = np.clip(s, -1.0, 1.0)
     angles = np.degrees(np.arccos(s))
     return float(np.max(angles)) if angles.size else 0.0
 
 
 def robust_z(x: np.ndarray) -> np.ndarray:
-    """Robust standardisation with a variance floor for near-flat traces."""
     x = np.asarray(x, dtype=float)
     finite = np.isfinite(x)
     out = np.zeros_like(x)
@@ -99,23 +90,12 @@ def robust_z(x: np.ndarray) -> np.ndarray:
     med = np.median(vals)
     mad_scale = 1.4826 * np.median(np.abs(vals - med))
     std_scale = np.std(vals)
-    # Pure MAD can be arbitrarily tiny when most path samples are flat. A
-    # small fraction of global std prevents numerical score explosions while
-    # preserving sensitivity to a narrow transition peak.
     scale = max(float(mad_scale), float(std_scale) * 0.10, EPS)
-    if scale <= EPS:
-        return out
     out[finite] = (vals - med) / scale
     return out
 
 
-def analyse_path(
-    t: np.ndarray,
-    sound_features: np.ndarray,
-    jacobians: np.ndarray,
-    coupling: np.ndarray | None = None,
-    weights: np.ndarray | None = None,
-) -> tuple[list[TransitionPoint], dict]:
+def analyse_path(t, sound_features, jacobians, coupling=None, weights=None):
     t = np.asarray(t, dtype=float)
     x = np.asarray(sound_features, dtype=float)
     js = np.asarray(jacobians, dtype=float)
@@ -124,23 +104,21 @@ def analyse_path(
     if not (len(t) == len(x) == len(js)) or len(t) < 3:
         raise ValueError("path arrays must have equal N >= 3")
     if x.shape[1] != js.shape[1]:
-        raise ValueError("feature dimension mismatch between sound_features and jacobians")
+        raise ValueError("feature dimension mismatch")
 
     metrics = np.stack([pullback_metric(j, weights) for j in js])
     ds = np.linalg.norm(np.diff(x, axis=0), axis=1)
     dg = np.linalg.norm(np.diff(metrics, axis=0), axis=(1, 2))
     rot = np.array([eigenspace_rotation_deg(metrics[i], metrics[i + 1]) for i in range(len(t) - 1)])
     cond = np.array([stable_condition_number(g) for g in metrics[1:]])
-
-    # High geometry change + low acoustic discontinuity is the chart-transition signature.
-    # Condition number is log-compressed because raw kappa can span orders of magnitude.
     score = robust_z(dg) + robust_z(rot) + robust_z(np.log10(np.maximum(cond, 1.0))) - robust_z(ds)
 
-    points: list[TransitionPoint] = []
+    points = []
     for i in range(len(score)):
         points.append(TransitionPoint(
             index=i + 1,
             t=float(t[i + 1]),
+            segment_midpoint=float(0.5 * (t[i] + t[i + 1])),
             sound_step=float(ds[i]),
             metric_step=float(dg[i]),
             eigenspace_rotation_deg=float(rot[i]),
@@ -153,9 +131,11 @@ def analyse_path(
     summary = {
         "n_samples": len(t),
         "candidate_t": best.t,
+        "candidate_segment_midpoint": best.segment_midpoint,
         "candidate_index": best.index,
         "candidate_score": best.score,
         "candidate_sound_step": best.sound_step,
+        "candidate_sound_ratio_to_median": best.sound_step / (float(np.median(ds)) + EPS),
         "candidate_metric_step": best.metric_step,
         "candidate_rotation_deg": best.eigenspace_rotation_deg,
         "candidate_condition_number": best.condition_number,
@@ -177,12 +157,14 @@ def load_npz(path: Path):
 
 
 def compare_directions(forward: dict, reverse: dict) -> dict:
-    # Reverse t is mapped back into the forward coordinate system.
-    reverse_on_forward_axis = 1.0 - float(reverse["candidate_t"])
-    delta = abs(float(forward["candidate_t"]) - reverse_on_forward_axis)
+    # A transition belongs to the interval between samples, not to its arrival
+    # endpoint. Compare interval midpoints to avoid a one-sample directional bias.
+    f_mid = float(forward["candidate_segment_midpoint"])
+    r_mid_mapped = 1.0 - float(reverse["candidate_segment_midpoint"])
+    delta = abs(f_mid - r_mid_mapped)
     return {
-        "forward_candidate_t": float(forward["candidate_t"]),
-        "reverse_candidate_t_mapped": reverse_on_forward_axis,
+        "forward_transition_midpoint": f_mid,
+        "reverse_transition_midpoint_mapped": r_mid_mapped,
         "transition_location_delta": delta,
         "bidirectional_reproduction": bool(delta <= 0.10),
     }
@@ -192,18 +174,14 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("forward", type=Path)
     ap.add_argument("--reverse", type=Path)
-    ap.add_argument("--weights", type=Path, help=".npy feature weights")
+    ap.add_argument("--weights", type=Path)
     ap.add_argument("--out", type=Path, default=Path("part6_result.json"))
     args = ap.parse_args()
 
     weights = np.load(args.weights) if args.weights else None
     ft, fx, fj, fc = load_npz(args.forward)
     fpoints, fsummary = analyse_path(ft, fx, fj, fc, weights)
-
-    result = {
-        "forward": fsummary,
-        "forward_trace": [asdict(p) for p in fpoints],
-    }
+    result = {"forward": fsummary, "forward_trace": [asdict(p) for p in fpoints]}
 
     if args.reverse:
         rt, rx, rj, rc = load_npz(args.reverse)
