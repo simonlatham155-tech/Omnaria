@@ -1,0 +1,61 @@
+name: Part 7 external falsification
+on:
+  push:
+    branches: [research/part6-chart-transitions]
+    paths:
+      - 'research/part7_external_falsification_preregistration.json'
+      - 'research/part7_external_baseline_renderer.py'
+      - 'research/part7_regenerate_external_suite.py'
+      - '.github/workflows/part7-external-falsification.yml'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install --upgrade pip numpy
+      - name: Regenerate external suite
+        run: python research/part7_regenerate_external_suite.py --samples 41 --seed 1618033 --out-dir research/data/part7_external
+      - name: Detect and score external suite
+        run: |
+          set -e
+          for mode in independent_sigmoid_additive_fm independent_sigmoid_modal_noise single_engine_continuous_fm single_engine_continuous_additive; do
+            python research/part6_chart_transition.py research/data/part7_external/${mode}_forward.npz --reverse research/data/part7_external/${mode}_reverse.npz --out research/data/part7_external/${mode}_detected.json
+            python research/part6_score_frozen_rule.py research/data/part7_external/${mode}_detected.json --out research/data/part7_external/${mode}_frozen.json
+          done
+      - name: Evaluate preregistered external falsification
+        run: |
+          python - <<'PY'
+          import json, pathlib, numpy as np, sys
+          sys.path.insert(0,'research')
+          from part6_predictive_handoff_rule import load_trace, score_trace
+          root=pathlib.Path('research/data/part7_external')
+          pre=json.loads(pathlib.Path('research/part7_external_falsification_preregistration.json').read_text())
+          tol=float(pre['success_criteria']['positive_location_tolerance'])
+          limit=float(pre['success_criteria']['negative_peak_prominence_limit'])
+          weights=(0.5,0.5,0.0,1.0)
+          out={'positives':{},'negatives':{},'overall_pass':False}
+          positive_ok=True
+          for rec in pre['positive_controls']:
+              name=rec['name']; target=float(rec['ground_truth_transition_center'])
+              pred=json.loads((root/f'{name}_frozen.json').read_text())
+              p=float(pred['predicted_handoff_midpoint']); err=abs(p-target); ok=err<=tol+1e-12
+              out['positives'][name]={'ground_truth':target,'predicted':p,'abs_error':err,'pass':ok}
+              positive_ok &= ok
+          negative_ok=True
+          for rec in pre['negative_controls']:
+              name=rec['name']; tr=load_trace(root/f'{name}_detected.json'); s=np.asarray(score_trace(tr,weights),float)
+              med=float(np.median(s)); mad=float(np.median(np.abs(s-med))); prom=float((np.max(s)-med)/(1.4826*mad+1e-12)); ok=prom<=limit+1e-12
+              out['negatives'][name]={'peak_prominence':prom,'limit':limit,'pass':ok,'predicted_peak':float(tr['t'][int(np.argmax(s))])}
+              negative_ok &= ok
+          out['overall_pass']=bool(positive_ok and negative_ok)
+          (root/'external_falsification_result.json').write_text(json.dumps(out,indent=2))
+          print(json.dumps(out,indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: part7-external-falsification
+          path: research/data/part7_external/
