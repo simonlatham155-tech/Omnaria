@@ -1,0 +1,25 @@
+name: Part 19
+on:
+  push:
+    branches: [research/part6-chart-transitions]
+    paths:
+      - 'research/part19_semantic_chart_controls.py'
+      - '.github/workflows/part19.yml'
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install numpy scipy
+      - run: python research/part19_semantic_chart_controls.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: part19-result
+          path: research/data/part19/part19_result.json
+          if-no-files-found: warn
