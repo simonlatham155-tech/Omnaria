@@ -1,0 +1,20 @@
+{
+  "status": "PREREGISTERED_BEFORE_TRACE_GENERATION",
+  "pairs": ["additive_modal", "granular_fm", "waveterrain_nonlinearchaos"],
+  "samples": 41,
+  "seed": 618033,
+  "frozen_rule": {
+    "D_G": 0.5,
+    "rotation": 0.5,
+    "log10_kappa": 0.0,
+    "sound_penalty": 1.0
+  },
+  "success_tolerance_abs_t": 0.025,
+  "bidirectional_reproduction_required_separately": true,
+  "endpoint_policy": "Reuse previously committed family renderers exactly at their family endpoints; no endpoint retuning for these cross-pair tests.",
+  "handoff_schedule": {
+    "mix": "alpha ** 1.6",
+    "coherence": "(1 - alpha) ** 0.65"
+  },
+  "decision_rule": "A pair counts as a prospective prediction success iff abs(predicted_handoff_midpoint - independently_detected_handoff_midpoint) <= 0.025. No rule or endpoint parameters may be changed after trace generation begins."
+}
