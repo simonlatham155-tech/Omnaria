@@ -1,0 +1,31 @@
+name: Part 14 variable-dimensional engine
+
+on:
+  push:
+    branches: [research/part6-chart-transitions]
+    paths:
+      - 'research/part14_variable_dim_engine.py'
+      - '.github/workflows/part14-variable-engine.yml'
+  workflow_dispatch:
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install numpy scipy
+      - name: Run Part 14 held-out engine evaluation
+        run: python research/part14_variable_dim_engine.py
+      - name: Upload Part 14 results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: part14-variable-engine
+          path: |
+            research/part14_results.json
+            research/part14_results.csv
+          if-no-files-found: warn
