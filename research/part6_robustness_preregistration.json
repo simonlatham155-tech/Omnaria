@@ -1,0 +1,16 @@
+{
+  "status": "preregistered_before_robustness_traces",
+  "frozen_rule": {"D_G": 0.5, "rotation": 0.5, "log10_kappa": 0.0, "sound_penalty": 1.0},
+  "pairs": ["additive_modal", "granular_fm", "waveterrain_nonlinearchaos"],
+  "variants": {
+    "seed_271828": {"seed": 271828, "pitch_factor": 1.0, "duration_fraction": 1.0, "control_profile": "base"},
+    "pitch_up": {"seed": 618033, "pitch_factor": 1.189207115, "duration_fraction": 1.0, "control_profile": "base"},
+    "short_window": {"seed": 618033, "pitch_factor": 1.0, "duration_fraction": 0.65, "control_profile": "base"},
+    "alternate_controls": {"seed": 618033, "pitch_factor": 1.0, "duration_fraction": 1.0, "control_profile": "alternate"}
+  },
+  "alternate_controls": [0.31, 0.72, 0.63, 0.41, 0.76, 0.27, 0.58, 0.84],
+  "success_tolerance": 0.025,
+  "primary_endpoint": "fraction of pair-variant cases where frozen-rule prediction is within tolerance of independently detected handoff",
+  "robustness_threshold": "at least 9 of 12 cases pass; no perturbation class may fail all three pairs",
+  "notes": "No renderer timing, detector weights, or predictor weights may be changed after this file is committed and before results are evaluated."
+}
