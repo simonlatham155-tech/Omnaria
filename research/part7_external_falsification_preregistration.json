@@ -9,13 +9,15 @@
   },
   "positive_controls": [
     {
-      "name": "independent_linear_additive_fm",
-      "architecture": "independent additive and FM algorithms joined only by linear amplitude interpolation",
+      "name": "independent_sigmoid_additive_fm",
+      "architecture": "independent additive and FM algorithms joined by an externally imposed sigmoid interpolation",
+      "ground_truth_transition_center": 0.68,
       "omnaria_handoff_schedule_used": false
     },
     {
       "name": "independent_sigmoid_modal_noise",
-      "architecture": "independent modal resonator and stochastic-noise algorithms joined by an externally specified sigmoid interpolation centered at 0.43",
+      "architecture": "independent modal resonator and stochastic-noise algorithms joined by an externally imposed sigmoid interpolation",
+      "ground_truth_transition_center": 0.43,
       "omnaria_handoff_schedule_used": false
     }
   ],
@@ -36,9 +38,9 @@
   },
   "success_criteria": {
     "positive_location_tolerance": 0.05,
-    "positive_requirement": "frozen-rule peak must lie within 0.05 of the independently detected strongest geometry transition in both positive controls",
+    "positive_requirement": "frozen-rule peak must lie within 0.05 of each positive control's preregistered ground-truth transition center",
     "negative_requirement": "negative controls must not show a transition peak prominence greater than 3.0 times their median transition score",
-    "overall_pass": "both positive controls pass location tolerance and both negative controls pass the no-concentrated-transition requirement"
+    "overall_pass": "both positive controls pass ground-truth location tolerance and both negative controls pass the no-concentrated-transition requirement"
   },
   "interpretation_boundary": "Passing this suite would show transfer beyond the reconstructed OMNARIA handoff schedule, but would still not establish a universal synthesis law."
 }
