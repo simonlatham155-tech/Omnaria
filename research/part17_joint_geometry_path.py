@@ -16,6 +16,14 @@ Z0=np.zeros(4)
 COST={'acoustic':1.0,'subspace':0.55,'rank':0.12,'weight_step':0.10,'nominal':0.08}
 
 
+def json_default(o):
+    if isinstance(o, np.bool_): return bool(o)
+    if isinstance(o, np.integer): return int(o)
+    if isinstance(o, np.floating): return float(o)
+    if isinstance(o, np.ndarray): return o.tolist()
+    raise TypeError(f'Object of type {o.__class__.__name__} is not JSON serializable')
+
+
 def smoothstep(x):
     x=np.clip(x,0.0,1.0); return x*x*(3.0-2.0*x)
 
@@ -51,7 +59,6 @@ def candidates(route,a):
     out=[]
     for p in PERT:
         out.append(simplex(n + .055*taper*p))
-    # keep deterministic unique candidates
     uniq=[]
     for w in out:
         if not any(np.max(np.abs(w-u))<1e-9 for u in uniq): uniq.append(w)
@@ -115,16 +122,12 @@ def evaluate(route,anchors,maps):
     p15=lambda n,z,w:params15(n,z,w,anchors,maps)
     layers=precompute(route,p15); path,cost=optimize(layers)
     feats=[x['f'] for x in path]; cp=continuity(feats)
-
-    # Baselines on the frozen nominal route.
     f15=[]; fcf=[]
     for a in ALPHAS:
         w=nominal_weights(route,a)
         f15.append(extract_features(render_weighted(w,Z0,TEST_SEED,p15)))
         fcf.append(extract_features(render_crossfade(w,TEST_SEED)))
     c15=continuity(f15); ccf=continuity(fcf)
-
-    # Transport frame along the optimized path.
     prev=None; Jus=[]; ranks=[]; d95=[]
     for x in path:
         _,_,V,r=local_svd(x['J']); B=transport_basis(prev,V,r); prev=B
@@ -134,12 +137,10 @@ def evaluate(route,anchors,maps):
         k=min(Jus[i].shape[1],Jus[i+1].shape[1])
         ovs.extend([ov(Jus[i][:,j],Jus[i+1][:,j]) for j in range(k)])
     control_fraction=float(np.mean(np.asarray(ovs)>=.85)) if ovs else 1.0
-
     audio_better=cp['p95']<=min(c15['p95'],ccf['p95'])+1e-12
     max_ok=cp['max_ratio']<=3.0
     control_ok=control_fraction>=.90
     adapt_ok=rank_flicker_free(ranks) or rank_flicker_free(d95)
-    # endpoints taper to nominal exactly, so endpoint fidelity is exact by construction.
     endpoint_ok=np.max(np.abs(path[0]['w']-nominal_weights(route,0)))<1e-9 and np.max(np.abs(path[-1]['w']-nominal_weights(route,1)))<1e-9
     passed=audio_better and max_ok and control_ok and adapt_ok and endpoint_ok
     return {
@@ -159,7 +160,8 @@ def main():
     chaos_ok=any(r['route_pass'] and 'chaos' in r['route'] for r in rows)
     out={'heldout_seed':TEST_SEED,'cost_weights':COST,'routes':rows,'route_passes':passes,
          'chaos_route_pass':chaos_ok,'overall_pass':passes>=3 and chaos_ok,'criteria':'Part 17 issue #18'}
-    (OUT/'part17_result.json').write_text(json.dumps(out,indent=2)+'\n')
-    print(json.dumps(out,indent=2))
+    text=json.dumps(out,indent=2,default=json_default)+'\n'
+    (OUT/'part17_result.json').write_text(text)
+    print(text,end='')
 
 if __name__=='__main__': main()
