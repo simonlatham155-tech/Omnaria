@@ -1,0 +1,33 @@
+name: Part 6 Wavetable Physical prospective
+on:
+  push:
+    branches: [ research/part6-chart-transitions ]
+    paths:
+      - 'research/part6_wavetable_physical_preregistered.json'
+      - 'research/wavetable_physical_reconstructed_renderer.py'
+      - 'research/part6_regenerate_wavetable_physical.py'
+      - '.github/workflows/part6-wavetable-physical-prospective.yml'
+  workflow_dispatch:
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install --upgrade pip numpy
+      - name: Regenerate Wavetable Physical trace
+        run: python research/part6_regenerate_wavetable_physical.py --samples 41 --seed 618033 --out-dir research/data/part6
+      - name: Detect observed handoff
+        run: python research/part6_chart_transition.py research/data/part6/wavetable_physical_forward_PROSPECTIVE.npz --reverse research/data/part6/physical_wavetable_reverse_PROSPECTIVE.npz --out research/data/part6/wavetable_physical_detected.json
+      - name: Score frozen rule
+        run: python research/part6_score_frozen_rule.py research/data/part6/wavetable_physical_detected.json --out research/data/part6/wavetable_physical_frozen_rule.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: part6-wavetable-physical-prospective
+          path: |
+            research/data/part6/wavetable_physical_detected.json
+            research/data/part6/wavetable_physical_frozen_rule.json
+            research/data/part6/wavetable_physical_forward_PROSPECTIVE.npz
+            research/data/part6/physical_wavetable_reverse_PROSPECTIVE.npz
