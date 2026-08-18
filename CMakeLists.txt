@@ -27,6 +27,8 @@ juce_add_plugin(OmnariaEngine3Test
   PRODUCT_NAME "Omnaria Engine 3 Test"
 )
 
+juce_generate_juce_header(OmnariaEngine3Test)
+
 target_sources(OmnariaEngine3Test PRIVATE
   Source/PluginProcessor.cpp
   Source/PluginProcessor.h
